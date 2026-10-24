@@ -1,0 +1,142 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerEmail() {
+      return isSignedIn() && request.auth.token.email == 'chotokhatasportingclub@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isOwnerEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Site settings: public read, admin write
+    match /siteSettings/{settingId} {
+      allow read: if isValidId(settingId);
+      allow write: if isAdmin() && isValidId(settingId);
+    }
+
+    // Hero banners: public read, admin write
+    match /banners/{bannerId} {
+      allow read: if isValidId(bannerId);
+      allow write: if isAdmin() && isValidId(bannerId);
+    }
+
+    // Homepage sections: public read, admin write
+    match /homepageSections/{sectionId} {
+      allow read: if isValidId(sectionId);
+      allow write: if isAdmin() && isValidId(sectionId);
+    }
+
+    // Players squad: public read, admin write
+    match /players/{playerId} {
+      allow read: if isValidId(playerId);
+      allow write: if isAdmin() && isValidId(playerId);
+    }
+
+    // Teams: public read, admin write
+    match /teams/{teamId} {
+      allow read: if isValidId(teamId);
+      allow write: if isAdmin() && isValidId(teamId);
+    }
+
+    // Matches and fixtures: public read, admin write
+    match /matches/{matchId} {
+      allow read: if isValidId(matchId);
+      allow write: if isAdmin() && isValidId(matchId);
+    }
+
+    // Tournaments: public read, admin write
+    match /tournaments/{tournamentId} {
+      allow read: if isValidId(tournamentId);
+      allow write: if isAdmin() && isValidId(tournamentId);
+    }
+
+    // League standings: public read, admin write
+    match /standings/{standingId} {
+      allow read: if isValidId(standingId);
+      allow write: if isAdmin() && isValidId(standingId);
+    }
+
+    // Gallery albums: public read, admin write
+    match /galleryAlbums/{albumId} {
+      allow read: if isValidId(albumId);
+      allow write: if isAdmin() && isValidId(albumId);
+    }
+
+    // Gallery media: public read, admin write
+    match /galleryMedia/{mediaId} {
+      allow read: if isValidId(mediaId);
+      allow write: if isAdmin() && isValidId(mediaId);
+    }
+
+    // News and announcements: public read published, admin can read drafts and write
+    match /news/{newsId} {
+      allow read: if isValidId(newsId) && (resource.data.status == 'published' || isAdmin());
+      allow write: if isAdmin() && isValidId(newsId);
+    }
+
+    // Achievements and trophies: public read, admin write
+    match /achievements/{achievementId} {
+      allow read: if isValidId(achievementId);
+      allow write: if isAdmin() && isValidId(achievementId);
+    }
+
+    // Sponsors: public read, admin write
+    match /sponsors/{sponsorId} {
+      allow read: if isValidId(sponsorId);
+      allow write: if isAdmin() && isValidId(sponsorId);
+    }
+
+    // Contact form submissions: visitors can create with valid input, admin can read/manage
+    match /contactMessages/{messageId} {
+      allow create: if isValidId(messageId) &&
+        incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 120 &&
+        incoming().email is string && incoming().email.size() > 3 && incoming().email.size() <= 120 &&
+        incoming().message is string && incoming().message.size() > 0 && incoming().message.size() <= 5000;
+      allow read, update, delete: if isAdmin() && isValidId(messageId);
+    }
+
+    // Administrators registry: only admins can view or modify
+    match /admins/{adminUid} {
+      allow read, write: if isAdmin() && isValidId(adminUid);
+    }
+
+    // Admin audit logs: only admin can read or append, immutable logs
+    match /adminActivityLogs/{logId} {
+      allow read, create: if isAdmin() && isValidId(logId);
+      allow update, delete: if false;
+    }
+
+    // Connection test document
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}

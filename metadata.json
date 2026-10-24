@@ -1,0 +1,6 @@
+{
+  "name": "Chhotokhata Sporting Club - ছোটখাতা স্পোর্টিং ক্লাব",
+  "description": "Official website and football club management system for Chhotokhata Sporting Club (ছোটখাতা স্পোর্টিং ক্লাব), featuring team squad, fixtures, live results, league table, gallery, and administrative management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

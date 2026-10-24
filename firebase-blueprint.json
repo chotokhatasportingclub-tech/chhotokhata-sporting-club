@@ -1,0 +1,340 @@
+{
+  "entities": {
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global website configuration, branding, theme, contact, and club history",
+      "type": "object",
+      "properties": {
+        "clubNameBn": { "type": "string", "maxLength": 200, "description": "Club name in Bengali" },
+        "clubNameEn": { "type": "string", "maxLength": 200, "description": "Club name in English" },
+        "shortName": { "type": "string", "maxLength": 50, "description": "Club short name or abbreviation" },
+        "websiteTitle": { "type": "string", "maxLength": 200, "description": "Browser and meta title" },
+        "websiteDescription": { "type": "string", "maxLength": 1000, "description": "Website meta description" },
+        "tagline": { "type": "string", "maxLength": 300, "description": "Club tagline and slogan" },
+        "foundingYear": { "type": "string", "maxLength": 20, "description": "Founding year or date" },
+        "history": { "type": "string", "maxLength": 10000, "description": "Club history and background" },
+        "mission": { "type": "string", "maxLength": 5000, "description": "Club mission statement" },
+        "vision": { "type": "string", "maxLength": 5000, "description": "Club vision statement" },
+        "phone": { "type": "string", "maxLength": 50, "description": "Contact phone number" },
+        "email": { "type": "string", "maxLength": 120, "description": "Contact email" },
+        "address": { "type": "string", "maxLength": 300, "description": "Club address and ground location" },
+        "homeGround": { "type": "string", "maxLength": 200, "description": "Name of home stadium/ground" },
+        "mapsUrl": { "type": "string", "maxLength": 500, "description": "Google Maps link" },
+        "facebookUrl": { "type": "string", "maxLength": 300, "description": "Facebook page URL" },
+        "youtubeUrl": { "type": "string", "maxLength": 300, "description": "YouTube channel URL" },
+        "instagramUrl": { "type": "string", "maxLength": 300, "description": "Instagram URL" },
+        "footerText": { "type": "string", "maxLength": 500, "description": "Footer copyright text" },
+        "logoUrl": { "type": "string", "maxLength": 1000000, "description": "Club logo image URL" },
+        "logoSize": { "type": "string", "maxLength": 20, "description": "Logo size small, medium, large" },
+        "primaryColor": { "type": "string", "maxLength": 30, "description": "Primary hex color" },
+        "secondaryColor": { "type": "string", "maxLength": 30, "description": "Secondary hex color" },
+        "accentColor": { "type": "string", "maxLength": 30, "description": "Accent hex color" },
+        "isDarkMode": { "type": "boolean", "description": "Whether dark mode is active" },
+        "updatedAt": { "type": "string", "description": "Last updated timestamp" }
+      }
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Hero banner slides for homepage with custom buttons and responsive images",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200, "description": "Banner headline" },
+        "subtitle": { "type": "string", "maxLength": 500, "description": "Banner subtitle" },
+        "imageUrl": { "type": "string", "maxLength": 1000000, "description": "Desktop banner image URL" },
+        "mobileImageUrl": { "type": "string", "maxLength": 1000000, "description": "Mobile banner image URL" },
+        "primaryButtonText": { "type": "string", "maxLength": 100, "description": "Primary button label" },
+        "primaryButtonLink": { "type": "string", "maxLength": 200, "description": "Primary button URL or anchor" },
+        "secondaryButtonText": { "type": "string", "maxLength": 100, "description": "Secondary button label" },
+        "secondaryButtonLink": { "type": "string", "maxLength": 200, "description": "Secondary button URL" },
+        "textAlignment": { "type": "string", "maxLength": 20, "description": "left, center, or right" },
+        "overlayOpacity": { "type": "number", "description": "Dark overlay percentage" },
+        "order": { "type": "number", "description": "Display order" },
+        "isActive": { "type": "boolean", "description": "Active status" }
+      },
+      "required": ["title", "imageUrl", "isActive"]
+    },
+    "HomepageSection": {
+      "title": "HomepageSection",
+      "description": "Configuration for homepage section ordering and visibility",
+      "type": "object",
+      "properties": {
+        "sectionKey": { "type": "string", "maxLength": 100, "description": "Unique key e.g. hero, intro, matches" },
+        "titleBn": { "type": "string", "maxLength": 200, "description": "Bengali section heading" },
+        "titleEn": { "type": "string", "maxLength": 200, "description": "English section heading" },
+        "subtitle": { "type": "string", "maxLength": 300, "description": "Section subtitle" },
+        "order": { "type": "number", "description": "Display order index" },
+        "isVisible": { "type": "boolean", "description": "Whether section is visible on public site" }
+      },
+      "required": ["sectionKey", "order", "isVisible"]
+    },
+    "Player": {
+      "title": "Player",
+      "description": "Football club player profile and statistics",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "maxLength": 150, "description": "Player full name" },
+        "nameBn": { "type": "string", "maxLength": 150, "description": "Player name in Bengali" },
+        "jerseyNumber": { "type": "number", "description": "Player jersey shirt number" },
+        "position": { "type": "string", "maxLength": 50, "description": "Goalkeeper, Defender, Midfielder, Forward" },
+        "photoUrl": { "type": "string", "maxLength": 1000000, "description": "Portrait image URL" },
+        "bio": { "type": "string", "maxLength": 3000, "description": "Player biography" },
+        "dateOfBirth": { "type": "string", "maxLength": 50, "description": "Date of birth or age" },
+        "nationality": { "type": "string", "maxLength": 80, "description": "Nationality" },
+        "appearances": { "type": "number", "description": "Total matches played" },
+        "goals": { "type": "number", "description": "Total goals scored" },
+        "assists": { "type": "number", "description": "Total assists made" },
+        "cleanSheets": { "type": "number", "description": "Clean sheets for goalkeepers" },
+        "isActive": { "type": "boolean", "description": "Whether player is actively in current squad" },
+        "isCaptain": { "type": "boolean", "description": "Captain status" },
+        "order": { "type": "number", "description": "Display order" }
+      },
+      "required": ["fullName", "position", "jerseyNumber", "isActive"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "Opponent and club team details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150, "description": "Team name" },
+        "shortName": { "type": "string", "maxLength": 50, "description": "Team acronym" },
+        "logoUrl": { "type": "string", "maxLength": 1000000, "description": "Team crest or logo" },
+        "city": { "type": "string", "maxLength": 100, "description": "City or home region" },
+        "isHomeClub": { "type": "boolean", "description": "True if Chhotokhata SC" }
+      },
+      "required": ["name"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Match fixtures, live status, and completed results",
+      "type": "object",
+      "properties": {
+        "homeTeamName": { "type": "string", "maxLength": 150, "description": "Home team name" },
+        "homeTeamLogo": { "type": "string", "maxLength": 1000000, "description": "Home team logo" },
+        "awayTeamName": { "type": "string", "maxLength": 150, "description": "Away team name" },
+        "awayTeamLogo": { "type": "string", "maxLength": 1000000, "description": "Away team logo" },
+        "matchDate": { "type": "string", "maxLength": 50, "description": "Match date YYYY-MM-DD" },
+        "matchTime": { "type": "string", "maxLength": 50, "description": "Match kickoff time" },
+        "venue": { "type": "string", "maxLength": 200, "description": "Stadium or match ground" },
+        "tournamentName": { "type": "string", "maxLength": 150, "description": "Tournament or Cup name" },
+        "homeScore": { "type": "number", "description": "Home team goals scored" },
+        "awayScore": { "type": "number", "description": "Away team goals scored" },
+        "status": { "type": "string", "enum": ["Upcoming", "Live", "Completed", "Postponed", "Cancelled"], "description": "Match status" },
+        "posterUrl": { "type": "string", "maxLength": 1000000, "description": "Match poster image URL" },
+        "report": { "type": "string", "maxLength": 10000, "description": "Match report and summary" },
+        "scorers": { "type": "string", "maxLength": 1000, "description": "Goal scorers list" }
+      },
+      "required": ["homeTeamName", "awayTeamName", "matchDate", "status"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Football tournament or league championship",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150, "description": "Tournament name" },
+        "season": { "type": "string", "maxLength": 50, "description": "Season e.g. 2026" },
+        "logoUrl": { "type": "string", "maxLength": 1000000, "description": "Tournament logo" },
+        "startDate": { "type": "string", "maxLength": 50, "description": "Start date" },
+        "endDate": { "type": "string", "maxLength": 50, "description": "End date" },
+        "status": { "type": "string", "maxLength": 50, "description": "Upcoming, Active, Completed" },
+        "description": { "type": "string", "maxLength": 2000, "description": "Tournament information" }
+      },
+      "required": ["name", "season", "status"]
+    },
+    "Standing": {
+      "title": "Standing",
+      "description": "League table standings record for a team",
+      "type": "object",
+      "properties": {
+        "tournamentName": { "type": "string", "maxLength": 150, "description": "Tournament name" },
+        "teamName": { "type": "string", "maxLength": 150, "description": "Team name" },
+        "teamLogo": { "type": "string", "maxLength": 1000000, "description": "Team crest" },
+        "position": { "type": "number", "description": "Table position" },
+        "played": { "type": "number", "description": "Matches played" },
+        "won": { "type": "number", "description": "Matches won" },
+        "drawn": { "type": "number", "description": "Matches drawn" },
+        "lost": { "type": "number", "description": "Matches lost" },
+        "goalsFor": { "type": "number", "description": "Goals scored" },
+        "goalsAgainst": { "type": "number", "description": "Goals conceded" },
+        "goalDifference": { "type": "number", "description": "Goal differential" },
+        "points": { "type": "number", "description": "Total points" }
+      },
+      "required": ["tournamentName", "teamName", "played", "won", "drawn", "lost", "points"]
+    },
+    "GalleryAlbum": {
+      "title": "GalleryAlbum",
+      "description": "Photo album category or event collection",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 150, "description": "Album title" },
+        "description": { "type": "string", "maxLength": 1000, "description": "Album description" },
+        "coverUrl": { "type": "string", "maxLength": 1000000, "description": "Album cover image" },
+        "eventDate": { "type": "string", "maxLength": 50, "description": "Event date" }
+      },
+      "required": ["title", "coverUrl"]
+    },
+    "GalleryMedia": {
+      "title": "GalleryMedia",
+      "description": "Individual photo or video item in gallery",
+      "type": "object",
+      "properties": {
+        "albumId": { "type": "string", "maxLength": 128, "description": "Album ID or category" },
+        "title": { "type": "string", "maxLength": 200, "description": "Media title" },
+        "caption": { "type": "string", "maxLength": 1000, "description": "Caption" },
+        "url": { "type": "string", "maxLength": 1000000, "description": "Media image or video URL" },
+        "mediaType": { "type": "string", "maxLength": 20, "description": "image or video" },
+        "date": { "type": "string", "maxLength": 50, "description": "Date taken" },
+        "order": { "type": "number", "description": "Order" }
+      },
+      "required": ["url", "mediaType"]
+    },
+    "News": {
+      "title": "News",
+      "description": "Club news articles, announcements, and match previews",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 250, "description": "Article headline" },
+        "content": { "type": "string", "maxLength": 25000, "description": "Full article text" },
+        "summary": { "type": "string", "maxLength": 1000, "description": "Short excerpt" },
+        "coverImage": { "type": "string", "maxLength": 1000000, "description": "Article cover photo" },
+        "category": { "type": "string", "maxLength": 80, "description": "Announcement, Match, Club News" },
+        "status": { "type": "string", "enum": ["published", "draft"], "description": "Publication state" },
+        "author": { "type": "string", "maxLength": 100, "description": "Author name" },
+        "publishedAt": { "type": "string", "maxLength": 50, "description": "Publish date string" },
+        "isFeatured": { "type": "boolean", "description": "Featured on homepage" }
+      },
+      "required": ["title", "content", "status"]
+    },
+    "Achievement": {
+      "title": "Achievement",
+      "description": "Club trophies, awards, and championship records",
+      "type": "object",
+      "properties": {
+        "trophyName": { "type": "string", "maxLength": 150, "description": "Trophy or cup title" },
+        "tournamentName": { "type": "string", "maxLength": 150, "description": "Tournament name" },
+        "year": { "type": "string", "maxLength": 50, "description": "Year won" },
+        "position": { "type": "string", "maxLength": 50, "description": "Champion, Runners-up, etc." },
+        "photoUrl": { "type": "string", "maxLength": 1000000, "description": "Trophy or ceremony photograph" },
+        "description": { "type": "string", "maxLength": 2000, "description": "Achievement context" }
+      },
+      "required": ["trophyName", "year", "position"]
+    },
+    "Sponsor": {
+      "title": "Sponsor",
+      "description": "Club partner or sponsor logo and details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150, "description": "Sponsor name" },
+        "logoUrl": { "type": "string", "maxLength": 1000000, "description": "Logo URL" },
+        "tier": { "type": "string", "maxLength": 50, "description": "Main Partner, Kit Sponsor, Official Partner" },
+        "websiteUrl": { "type": "string", "maxLength": 300, "description": "Website link" },
+        "order": { "type": "number", "description": "Display order" },
+        "isActive": { "type": "boolean", "description": "Active status" }
+      },
+      "required": ["name", "logoUrl", "isActive"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Messages submitted via public contact form",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 120, "description": "Sender name" },
+        "email": { "type": "string", "maxLength": 120, "description": "Sender email" },
+        "phone": { "type": "string", "maxLength": 50, "description": "Sender phone number" },
+        "subject": { "type": "string", "maxLength": 200, "description": "Message subject" },
+        "message": { "type": "string", "maxLength": 5000, "description": "Message body" },
+        "status": { "type": "string", "enum": ["new", "read", "replied"], "description": "Message status" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Creation timestamp" }
+      },
+      "required": ["name", "email", "message", "status"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Administrator account role document",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 120, "description": "Admin email" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "editor"], "description": "Privilege level" },
+        "addedAt": { "type": "string", "maxLength": 50, "description": "Creation timestamp" }
+      },
+      "required": ["email", "role"]
+    },
+    "AdminActivityLog": {
+      "title": "AdminActivityLog",
+      "description": "Audit log entry for administrative changes",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "maxLength": 100, "description": "Action type" },
+        "details": { "type": "string", "maxLength": 1000, "description": "Action details" },
+        "adminEmail": { "type": "string", "maxLength": 120, "description": "Email of admin who performed action" },
+        "timestamp": { "type": "string", "maxLength": 50, "description": "Timestamp string" }
+      },
+      "required": ["action", "adminEmail", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/siteSettings/{settingId}": {
+      "schema": "#/entities/SiteSettings",
+      "description": "Global website settings documents: general, branding, theme, contact"
+    },
+    "/banners/{bannerId}": {
+      "schema": "#/entities/Banner",
+      "description": "Homepage hero banner carousel slides"
+    },
+    "/homepageSections/{sectionId}": {
+      "schema": "#/entities/HomepageSection",
+      "description": "Ordered homepage section configurations and visibility"
+    },
+    "/players/{playerId}": {
+      "schema": "#/entities/Player",
+      "description": "Club squad player profiles and stats"
+    },
+    "/teams/{teamId}": {
+      "schema": "#/entities/Team",
+      "description": "Opponent and club teams"
+    },
+    "/matches/{matchId}": {
+      "schema": "#/entities/Match",
+      "description": "Fixtures, live match status, and match results"
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": "#/entities/Tournament",
+      "description": "Tournament and league championship records"
+    },
+    "/standings/{standingId}": {
+      "schema": "#/entities/Standing",
+      "description": "League table standings"
+    },
+    "/galleryAlbums/{albumId}": {
+      "schema": "#/entities/GalleryAlbum",
+      "description": "Photo gallery albums"
+    },
+    "/galleryMedia/{mediaId}": {
+      "schema": "#/entities/GalleryMedia",
+      "description": "Gallery images and videos"
+    },
+    "/news/{newsId}": {
+      "schema": "#/entities/News",
+      "description": "Club news articles and announcements"
+    },
+    "/achievements/{achievementId}": {
+      "schema": "#/entities/Achievement",
+      "description": "Club trophies and achievements"
+    },
+    "/sponsors/{sponsorId}": {
+      "schema": "#/entities/Sponsor",
+      "description": "Club sponsors and corporate partners"
+    },
+    "/contactMessages/{messageId}": {
+      "schema": "#/entities/ContactMessage",
+      "description": "Contact messages from visitors"
+    },
+    "/admins/{adminUid}": {
+      "schema": "#/entities/AdminUser",
+      "description": "Authorized administrator user documents"
+    },
+    "/adminActivityLogs/{logId}": {
+      "schema": "#/entities/AdminActivityLog",
+      "description": "Audit logs for changes made by admins"
+    }
+  }
+}

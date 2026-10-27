@@ -327,3 +327,43 @@ export interface AdminActivityLog {
   adminEmail: string;
   timestamp: string;
 }
+
+export type RegistrationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface PlayerRegistration {
+  id: string;
+  registrationNo: string;
+  fullNameBn: string;
+  fullNameEn: string;
+  fatherName: string;
+  dateOfBirth: string;
+  mobileNumber: string;
+  altMobileNumber?: string;
+  address: string;
+  photoUrl: string;
+  sport: string;
+  position: string;
+  sportRole?: string;
+  jerseyNumber?: number;
+  previousClub?: string;
+  experience?: string;
+  emergencyContact?: string;
+  additionalInfo?: string;
+  status: RegistrationStatus;
+  rejectionReason?: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  approvedPlayerId?: string;
+}
+
+export interface RegistrationSettings {
+  isOpen: boolean;
+  deadline?: string;
+  announcementBn?: string;
+  announcementEn?: string;
+  allowedSports: string[];
+  instructionsBn?: string;
+  contactNumber?: string;
+  updatedAt?: string;
+}

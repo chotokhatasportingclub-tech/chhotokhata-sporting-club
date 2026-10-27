@@ -16,8 +16,9 @@ import {
   Achievement,
   Sponsor,
   GalleryMedia,
-  AdminUser,
   SportCategory,
+  PlayerRegistration,
+  RegistrationSettings,
 } from '../types';
 import {
   fetchSiteSettings,
@@ -34,6 +35,8 @@ import {
   fetchGalleryMedia,
   fetchAdmins,
   fetchSportCategories,
+  fetchRegistrationSettings,
+  fetchPlayerRegistrations,
   DEFAULT_SETTINGS,
   DEFAULT_SECTIONS,
   DEFAULT_BANNERS,
@@ -47,6 +50,7 @@ import {
   DEFAULT_SPONSORS,
   DEFAULT_GALLERY,
   DEFAULT_SPORT_CATEGORIES,
+  DEFAULT_REGISTRATION_SETTINGS,
   seedInitialDataToFirestore,
 } from '../services/db';
 
@@ -77,6 +81,10 @@ interface AppContextType {
   currentUser: User | null;
   isAdmin: boolean;
   adminUsers: AdminUser[];
+  registrationSettings: RegistrationSettings;
+  setRegistrationSettingsState: (settings: RegistrationSettings) => void;
+  registrations: PlayerRegistration[];
+  fetchAndSetRegistrations: () => Promise<void>;
   currentRoute: string;
   setCurrentRoute: (route: string) => void;
   selectedSportFilter: string;
@@ -108,6 +116,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [sponsors, setSponsors] = useState<Sponsor[]>(DEFAULT_SPONSORS);
   const [gallery, setGallery] = useState<GalleryMedia[]>(DEFAULT_GALLERY);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [registrationSettings, setRegistrationSettingsState] = useState<RegistrationSettings>(DEFAULT_REGISTRATION_SETTINGS);
+  const [registrations, setRegistrations] = useState<PlayerRegistration[]>([]);
   const [selectedSportFilter, setSelectedSportFilter] = useState<string>('all');
   
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -115,9 +125,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [loading, setLoading] = useState<boolean>(true);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Navigation route management
+  // Navigation route management (supports /player-registration and #player-registration)
   const getInitialRoute = () => {
-    const hash = window.location.hash.replace('#', '');
+    const path = window.location.pathname.replace(/^\//, '');
+    if (path === 'player-registration' || path === 'registration') {
+      return 'player-registration';
+    }
+    const hash = window.location.hash.replace('#', '').replace(/^\//, '');
+    if (hash === 'player-registration' || hash === 'registration') {
+      return 'player-registration';
+    }
     return hash || 'home';
   };
   const [currentRoute, setCurrentRouteState] = useState<string>(getInitialRoute());
@@ -130,7 +147,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
+      const hash = window.location.hash.replace('#', '').replace(/^\//, '');
+      if (hash === 'player-registration' || hash === 'registration') {
+        setCurrentRouteState('player-registration');
+        return;
+      }
       setCurrentRouteState(hash || 'home');
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -208,6 +229,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sSponsors,
         sGallery,
         sAdmins,
+        sRegSettings,
+        sRegistrations,
       ] = await Promise.all([
         fetchSiteSettings(),
         fetchBanners(),
@@ -223,6 +246,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         fetchSponsors(),
         fetchGalleryMedia(),
         fetchAdmins(),
+        fetchRegistrationSettings(),
+        fetchPlayerRegistrations(),
       ]);
 
       setSettings(sSettings);
@@ -239,6 +264,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSponsors(sSponsors);
       setGallery(sGallery);
       setAdminUsers(sAdmins);
+      setRegistrationSettingsState(sRegSettings);
+      setRegistrations(sRegistrations);
 
       // Verify admin status again if user logged in
       if (auth.currentUser) {
@@ -326,6 +353,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const fetchAndSetRegistrations = async () => {
+    try {
+      const regList = await fetchPlayerRegistrations();
+      setRegistrations(regList);
+    } catch (err) {
+      console.warn('Could not fetch registrations:', err);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -349,6 +385,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentUser,
         isAdmin,
         adminUsers,
+        registrationSettings,
+        setRegistrationSettingsState,
+        registrations,
+        fetchAndSetRegistrations,
         currentRoute,
         setCurrentRoute,
         selectedSportFilter,

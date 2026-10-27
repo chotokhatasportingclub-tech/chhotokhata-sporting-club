@@ -152,6 +152,23 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin() && isValidId(messageId);
     }
 
+    // Player self-registration settings: public read, admin write
+    match /registrationSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidId(settingId);
+    }
+
+    // Player self-registration submissions: public can apply, admins manage approvals
+    match /playerRegistrations/{regId} {
+      allow create: if isValidId(regId) &&
+        incoming().fullNameBn is string && incoming().fullNameBn.size() > 0 && incoming().fullNameBn.size() <= 120 &&
+        incoming().fullNameEn is string && incoming().fullNameEn.size() > 0 && incoming().fullNameEn.size() <= 120 &&
+        incoming().mobileNumber is string && incoming().mobileNumber.size() >= 8 && incoming().mobileNumber.size() <= 20 &&
+        incoming().status == 'pending';
+      allow read: if isAdmin() || (resource != null && resource.data.id == regId);
+      allow update, delete: if isAdmin() && isValidId(regId);
+    }
+
     // Administrators registry: only admins can view or modify
     match /admins/{adminUid} {
       allow read, write: if isAdmin() && isValidId(adminUid);

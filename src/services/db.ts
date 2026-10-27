@@ -35,6 +35,9 @@ import {
   AdminActivityLog,
   SportCategory,
   SportType,
+  PlayerRegistration,
+  RegistrationSettings,
+  RegistrationStatus,
 } from '../types';
 
 export const DEFAULT_LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200"><defs><linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%230f172a"/><stop offset="50%" stop-color="%23071426"/><stop offset="100%" stop-color="%2316a34a"/></linearGradient><linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23facc15"/><stop offset="100%" stop-color="%23ca8a04"/></linearGradient></defs><path d="M100 10 L180 45 C180 120, 100 185, 100 185 C100 185, 20 120, 20 45 Z" fill="url(%23shieldGrad)" stroke="%23facc15" stroke-width="6"/><path d="M100 22 L168 52 C168 115, 100 172, 100 172 C100 172, 32 115, 32 52 Z" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/><circle cx="100" cy="85" r="32" fill="%23ffffff" stroke="%23071426" stroke-width="3"/><polygon points="100,73 108,80 105,90 95,90 92,80" fill="%23071426"/><polygon points="85,62 93,65 92,75 80,75 78,67" fill="%23071426"/><polygon points="115,62 122,67 120,75 108,75 107,65" fill="%23071426"/><polygon points="73,95 82,90 89,97 85,107 75,105" fill="%23071426"/><polygon points="127,95 125,105 115,107 111,97 118,90" fill="%23071426"/><text x="100" y="132" font-family="Arial, sans-serif" font-weight="900" font-size="18" fill="%23facc15" text-anchor="middle" letter-spacing="1.5">CCSC</text><text x="100" y="148" font-family="Arial, sans-serif" font-weight="700" font-size="10" fill="%23ffffff" text-anchor="middle">EST. 2014</text><text x="100" y="162" font-family="Arial, sans-serif" font-size="8.5" font-weight="700" fill="%2386efac" text-anchor="middle">ছোটখাতা চৌপথী</text></svg>`;
@@ -1921,6 +1924,201 @@ export async function deleteSportCategory(id: string): Promise<void> {
       }
     }
     await logAdminActivity('Delete Sport Category', `Deleted sport category ID: ${id}`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    throw error;
+  }
+}
+
+export const DEFAULT_REGISTRATION_SETTINGS: RegistrationSettings = {
+  isOpen: true,
+  deadline: '',
+  announcementBn: 'ছোটখাতা চৌপথী স্পোর্টস এন্ড কালচারাল ক্লাবে ২০২৬ মৌসুমের জন্য নতুন খেলোয়াড় ও প্রতিভাবান ক্রীড়াবিদ নিবন্ধন কার্যক্রম চলছে। আগ্রহী সকল খেলোয়াড়দের দ্রুত আবেদন করার আহ্বান জানানো হচ্ছে।',
+  announcementEn: 'Player registration is open for season 2026. Talented players and athletes are welcomed to apply.',
+  allowedSports: ['football', 'cricket', 'badminton', 'volleyball', 'table_tennis', 'athletics', 'cultural'],
+  instructionsBn: 'সঠিক তথ্য ও স্পষ্ট ছবি দিয়ে আবেদন ফরমটি সম্পূর্ণ করুন। আবেদন সফলভাবে জমা হলে আপনি একটি ট্র্যাকিং রেজিস্ট্রেশন নম্বর পাবেন। ক্লাবের যাচাই-বাছাই কমিটির অনুমোদনের পর খেলোয়াড় স্কোয়াডে অন্তর্ভুক্ত হবেন।',
+  contactNumber: '+880 1712-345678',
+  updatedAt: new Date().toISOString(),
+};
+
+export async function fetchRegistrationSettings(): Promise<RegistrationSettings> {
+  const path = 'registrationSettings/general';
+  try {
+    const snap = await getDoc(doc(db, 'registrationSettings', 'general'));
+    if (snap.exists()) {
+      return { ...DEFAULT_REGISTRATION_SETTINGS, ...(snap.data() as RegistrationSettings) };
+    }
+    return DEFAULT_REGISTRATION_SETTINGS;
+  } catch (error) {
+    console.warn('Using default registration settings fallback:', error);
+    return DEFAULT_REGISTRATION_SETTINGS;
+  }
+}
+
+export async function saveRegistrationSettings(settings: RegistrationSettings): Promise<void> {
+  const path = 'registrationSettings/general';
+  try {
+    await setDoc(doc(db, 'registrationSettings', 'general'), {
+      ...settings,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    await logAdminActivity('Save Registration Settings', 'Updated player registration rules, allowed sports, and announcement');
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+    throw error;
+  }
+}
+
+export async function submitPlayerRegistration(
+  data: Omit<PlayerRegistration, 'id' | 'registrationNo' | 'status' | 'submittedAt'>
+): Promise<PlayerRegistration> {
+  const cleanId = `reg_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const path = `playerRegistrations/${cleanId}`;
+  
+  // Format registration number: CSC-2026-XXXX
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  const registrationNo = `CSC-2026-${randomSuffix}`;
+
+  const registrationRecord: PlayerRegistration = {
+    ...data,
+    id: cleanId,
+    registrationNo,
+    status: 'pending',
+    submittedAt: new Date().toISOString(),
+  };
+
+  try {
+    await setDoc(doc(db, 'playerRegistrations', cleanId), registrationRecord);
+    return registrationRecord;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    throw error;
+  }
+}
+
+export async function fetchPlayerRegistrations(): Promise<PlayerRegistration[]> {
+  const path = 'playerRegistrations';
+  try {
+    const snap = await getDocs(collection(db, 'playerRegistrations'));
+    if (snap.empty) {
+      return [];
+    }
+    const list: PlayerRegistration[] = [];
+    snap.forEach((d) => {
+      list.push(d.data() as PlayerRegistration);
+    });
+    return list.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  } catch (error) {
+    console.warn('Error fetching player registrations:', error);
+    return [];
+  }
+}
+
+export async function updatePlayerRegistrationStatus(
+  id: string,
+  status: RegistrationStatus,
+  rejectionReason?: string
+): Promise<void> {
+  const path = `playerRegistrations/${id}`;
+  try {
+    const updatePayload: Partial<PlayerRegistration> = {
+      status,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: auth.currentUser?.email || 'admin',
+    };
+    if (rejectionReason !== undefined) {
+      updatePayload.rejectionReason = rejectionReason;
+    }
+    await updateDoc(doc(db, 'playerRegistrations', id), updatePayload);
+    await logAdminActivity('Update Registration Status', `Updated registration ${id} status to ${status}`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    throw error;
+  }
+}
+
+export async function approveAndPromotePlayer(reg: PlayerRegistration): Promise<Player> {
+  const regPath = `playerRegistrations/${reg.id}`;
+  try {
+    // 1. Check existing players in database
+    const allPlayers = await fetchPlayers();
+    
+    // Check if player matches an existing record (by English name or Bengali name)
+    let existingPlayer = allPlayers.find((p) => 
+      (p.fullName && reg.fullNameEn && p.fullName.toLowerCase().trim() === reg.fullNameEn.toLowerCase().trim()) ||
+      (p.nameBn && reg.fullNameBn && p.nameBn.trim() === reg.fullNameBn.trim())
+    );
+
+    let targetPlayer: Player;
+
+    if (existingPlayer) {
+      // Merge into existing player record without creating duplicate
+      targetPlayer = {
+        ...existingPlayer,
+        fullName: reg.fullNameEn || existingPlayer.fullName,
+        nameBn: reg.fullNameBn || existingPlayer.nameBn,
+        position: (reg.position as PlayerPosition) || existingPlayer.position,
+        sport: reg.sport || existingPlayer.sport || 'football',
+        sportRole: reg.sportRole || reg.position || existingPlayer.sportRole,
+        photoUrl: reg.photoUrl || existingPlayer.photoUrl,
+        dateOfBirth: reg.dateOfBirth || existingPlayer.dateOfBirth,
+        jerseyNumber: reg.jerseyNumber || existingPlayer.jerseyNumber,
+        bio: reg.additionalInfo || existingPlayer.bio,
+        isActive: true,
+      };
+      await savePlayer(targetPlayer);
+    } else {
+      // Create new player record
+      const newPlayerId = `p-${Date.now()}`;
+      targetPlayer = {
+        id: newPlayerId,
+        fullName: reg.fullNameEn,
+        nameBn: reg.fullNameBn,
+        jerseyNumber: reg.jerseyNumber || (allPlayers.length + 1),
+        position: (reg.position as PlayerPosition) || 'Midfielder',
+        sport: reg.sport || 'football',
+        sportRole: reg.sportRole || reg.position,
+        photoUrl: reg.photoUrl || '',
+        bio: reg.additionalInfo || `${reg.sport} খেলোয়াড়। অভিজ্ঞতা: ${reg.experience || 'নবাগত'}`,
+        dateOfBirth: reg.dateOfBirth,
+        appearances: 0,
+        goals: 0,
+        assists: 0,
+        cleanSheets: 0,
+        runsScored: 0,
+        wicketsTaken: 0,
+        setsWon: 0,
+        personalBest: '',
+        medalsWon: 0,
+        culturalGenre: reg.sport === 'cultural' ? (reg.sportRole || '') : '',
+        isActive: true,
+        isCaptain: false,
+        order: allPlayers.length + 1,
+      };
+      await savePlayer(targetPlayer);
+    }
+
+    // 2. Update registration document with approved status & playerId
+    await updateDoc(doc(db, 'playerRegistrations', reg.id), {
+      status: 'approved',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: auth.currentUser?.email || 'admin',
+      approvedPlayerId: targetPlayer.id,
+    });
+
+    await logAdminActivity('Approve Player Registration', `Approved registration ${reg.registrationNo} for ${reg.fullNameBn} (${targetPlayer.fullName})`);
+    return targetPlayer;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, regPath);
+    throw error;
+  }
+}
+
+export async function deletePlayerRegistration(id: string): Promise<void> {
+  const path = `playerRegistrations/${id}`;
+  try {
+    await deleteDoc(doc(db, 'playerRegistrations', id));
+    await logAdminActivity('Delete Player Registration', `Deleted application ${id}`);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
     throw error;

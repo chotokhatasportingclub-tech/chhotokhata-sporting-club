@@ -14,6 +14,7 @@ import { News } from './pages/public/News';
 import { Achievements } from './pages/public/Achievements';
 import { Contact } from './pages/public/Contact';
 import { LineupPage } from './pages/public/LineupPage';
+import { PlayerRegistrationPage } from './pages/public/PlayerRegistrationPage';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Shield, Loader2 } from 'lucide-react';
@@ -86,6 +87,9 @@ const MainContent: React.FC = () => {
         return <Achievements />;
       case 'contact':
         return <Contact />;
+      case 'player-registration':
+      case 'registration':
+        return <PlayerRegistrationPage />;
       case 'home':
       default:
         return <Home />;

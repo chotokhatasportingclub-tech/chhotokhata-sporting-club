@@ -15,11 +15,12 @@ import {
   Lock,
   ChevronRight,
   Sparkles,
+  UserCheck,
 } from 'lucide-react';
 import { DEFAULT_LOGO_SVG } from '../../services/db';
 
 export const Navbar: React.FC = () => {
-  const { settings, language, setLanguage, currentRoute, setCurrentRoute, currentUser, isAdmin } = useApp();
+  const { settings, language, setLanguage, currentRoute, setCurrentRoute, currentUser, isAdmin, registrationSettings } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isBn = language === 'bn';
@@ -28,6 +29,7 @@ export const Navbar: React.FC = () => {
     { key: 'home', labelBn: 'হোম', labelEn: 'Home' },
     { key: 'about', labelBn: 'ক্লাব পরিচিতি', labelEn: 'About' },
     { key: 'players', labelBn: 'খেলোয়াড় স্কোয়াড', labelEn: 'Squad' },
+    { key: 'player-registration', labelBn: 'খেলোয়াড় নিবন্ধন', labelEn: 'Registration' },
     { key: 'lineup', labelBn: 'ম্যাচ লাইনআপ', labelEn: 'Lineup' },
     { key: 'squad-builder', labelBn: 'দল তৈরি করুন', labelEn: 'Squad Builder' },
     { key: 'matches', labelBn: 'ম্যাচ ও ফলাফল', labelEn: 'Fixtures' },

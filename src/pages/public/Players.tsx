@@ -245,6 +245,10 @@ export const Players: React.FC = () => {
                       <img
                         src={player.photoUrl}
                         alt={player.fullName}
+                        onError={(e) => {
+                          // Hide broken image and show kit badge fallback
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                         className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (

@@ -20,7 +20,8 @@ export const PlayerKitBadge: React.FC<PlayerKitBadgeProps> = ({
   isCaptain = false,
   className = '',
 }) => {
-  const hasAuthenticPhoto = Boolean(photoUrl && photoUrl.trim() !== '');
+  const [imgError, setImgError] = React.useState(false);
+  const hasAuthenticPhoto = Boolean(!imgError && photoUrl && photoUrl.trim() !== '');
 
   // Dimensions based on size
   const sizeClasses = {
@@ -50,6 +51,7 @@ export const PlayerKitBadge: React.FC<PlayerKitBadgeProps> = ({
           <img
             src={photoUrl}
             alt={name}
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover object-top"
           />
         </div>

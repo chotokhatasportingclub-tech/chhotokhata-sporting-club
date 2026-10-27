@@ -49,8 +49,15 @@ export const News: React.FC = () => {
           >
             <div className="lg:col-span-7 relative aspect-16/10 overflow-hidden bg-slate-950">
               <img
-                src={featuredArticle.coverImage || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1200&auto=format&fit=crop'}
+                src={featuredArticle.coverImage || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop'}
                 alt={featuredArticle.title}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.dataset.hasFallenBack) {
+                    target.dataset.hasFallenBack = 'true';
+                    target.src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop';
+                  }
+                }}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-700 text-xs font-bold text-amber-400 flex items-center gap-1.5">
@@ -116,8 +123,15 @@ export const News: React.FC = () => {
               <div>
                 <div className="relative aspect-16/10 overflow-hidden bg-slate-950">
                   <img
-                    src={article.coverImage || 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop'}
+                    src={article.coverImage || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop'}
                     alt={article.title}
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.dataset.hasFallenBack) {
+                        target.dataset.hasFallenBack = 'true';
+                        target.src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop';
+                      }
+                    }}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md text-[10px] font-bold text-emerald-400 border border-slate-700">
@@ -158,7 +172,7 @@ export const News: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
 
-            {activeArticleModal.coverImage && (
+            {activeArticleModal.coverImage && activeArticleModal.coverImage.trim() !== '' && (
               <div className="relative aspect-16/9 bg-slate-950 shrink-0">
                 <img
                   src={activeArticleModal.coverImage}

@@ -7,26 +7,94 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
-  Sparkles,
-  KeyRound,
+  ExternalLink,
+  HelpCircle,
+  RefreshCw,
+  Info,
 } from 'lucide-react';
+import { DEFAULT_LOGO_SVG } from '../../services/db';
 
 export const AdminLogin: React.FC = () => {
-  const { loginWithGoogle, currentUser, isAdmin, setCurrentRoute, language, settings } = useApp();
+  const { loginWithGoogle, logout, currentUser, isAdmin, setCurrentRoute, language, settings } = useApp();
   const isBn = language === 'bn';
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{
+    code: string;
+    title: string;
+    message: string;
+    steps?: string[];
+  } | null>(null);
 
   const handleGoogleLogin = async () => {
-    setError(null);
+    setErrorDetails(null);
     setLoading(true);
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      console.error('Login action error:', err);
+      const code = err.code || '';
+      const msg = err.message || '';
+
+      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain') || msg.includes('not authorized')) {
+        setErrorDetails({
+          code: 'auth/unauthorized-domain',
+          title: 'ডোমেইন অনুমোদন প্রয়োজন (Domain Not Authorized)',
+          message: 'আপনার হোস্টিং ডোমেইনটি (chotokhata-sporting-club.web.app) ফায়ারবেস অথেনটিকেশনের অনুমোদিত তালিকায় যুক্ত নেই।',
+          steps: [
+            'Firebase Console (console.firebase.google.com) এ যান।',
+            'বাম পাশের মেনু থেকে Authentication → Settings (বা Authorized Domains) ট্যাবে যান।',
+            '"Add domain" বাটনে ক্লিক করে chotokhata-sporting-club.web.app যোগ করুন।',
+            'ডোমেইন যুক্ত হওয়ার পর এই পেজে ফিরে এসে পুনরায় লগইন করুন।',
+          ],
+        });
+      } else if (code === 'auth/operation-not-allowed' || msg.includes('operation-not-allowed')) {
+        setErrorDetails({
+          code: 'auth/operation-not-allowed',
+          title: 'Google Sign-In সক্রিয় করা নেই (Provider Disabled)',
+          message: 'আপনার ফায়ারবেস প্রজেক্টে Google সাইন-ইন মেথড এখনো এনাবল (Enable) করা হয়নি।',
+          steps: [
+            'Firebase Console (console.firebase.google.com) এ যান।',
+            'Authentication → Sign-in method ট্যাবে যান।',
+            'Sign-in providers তালিকা থেকে Google নির্বাচন করুন।',
+            'Enable টগলটি চালু করুন, প্রজেক্ট সাপোর্ট ইমেইল হিসেবে chotokhatasportingclub@gmail.com নির্বাচন করে Save করুন।',
+          ],
+        });
+      } else if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
+        setErrorDetails({
+          code: 'auth/popup-blocked',
+          title: 'পপআপ ব্লক হয়েছে (Browser Popup Blocked)',
+          message: 'আপনার ব্রাউজার Google লগইন উইন্ডোটি ব্লক করেছে।',
+          steps: [
+            'ব্রাউজারের এড্রেস বারের ডান পাশে থাকা "পপআপ ব্লক" আইকনে ক্লিক করুন।',
+            '"Always allow pop-ups and redirects from this site" অপশনটি সিলেক্ট করে Done চাপুন।',
+            'আবার লগইন বাটনে চাপুন।',
+          ],
+        });
+      } else if (code === 'auth/popup-closed-by-user') {
+        setErrorDetails({
+          code: 'auth/popup-closed-by-user',
+          title: 'লগইন উইন্ডো বন্ধ করা হয়েছে',
+          message: 'লগইন প্রক্রিয়া সম্পন্ন হওয়ার আগেই পপআপ উইন্ডোটি বন্ধ করা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।',
+        });
+      } else {
+        setErrorDetails({
+          code: code || 'auth/unknown',
+          title: 'লগইন ত্রুটি (Login Error)',
+          message: msg || 'লগইন সম্পন্ন করা সম্ভব হয়নি। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করে পুনরায় চেষ্টা করুন।',
+        });
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSwitchAccount = async () => {
+    try {
+      await logout();
+      await handleGoogleLogin();
+    } catch (e) {
+      console.warn('Switch account error:', e);
     }
   };
 
@@ -35,7 +103,7 @@ export const AdminLogin: React.FC = () => {
       <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-10 shadow-2xl relative text-center">
         {/* Crest */}
         <div className="w-20 h-20 rounded-3xl bg-slate-950 border border-slate-800 p-2 mx-auto mb-6 shadow-inner flex items-center justify-center">
-          <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+          <img src={settings.logoUrl || DEFAULT_LOGO_SVG} alt="Logo" className="w-full h-full object-contain" />
         </div>
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
@@ -52,56 +120,57 @@ export const AdminLogin: React.FC = () => {
             : 'Authorized club officers login to manage scores, players, banners, news, and site configuration.'}
         </p>
 
-        {currentUser && isAdmin ? (
+        {currentUser && !isAdmin ? (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-              <div className="text-left">
-                <div className="font-bold">অ্যাডমিন প্রবেশাধিকার সক্রিয়</div>
-                <div>ইমেইল: {currentUser.email}</div>
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-left space-y-2">
+              <div className="flex items-center gap-2 font-bold text-amber-400">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <span>অননুমোদিত একাউন্ট ({currentUser.email})</span>
               </div>
+              <p className="text-[11px] leading-relaxed text-slate-300">
+                আপনি যে ইমেইল দিয়ে লগইন করেছেন তা ক্লাবের অনুমোদিত অ্যাডমিন তালিকায় নেই। ক্লাবের প্রধান প্রশাসনিক ইমেইল{' '}
+                <span className="font-mono text-emerald-400 font-bold">chotokhatasportingclub@gmail.com</span> দিয়ে লগইন করুন।
+              </p>
             </div>
 
             <button
-              onClick={() => setCurrentRoute('admin')}
-              className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950 transition cursor-pointer flex items-center justify-center gap-2"
+              onClick={handleSwitchAccount}
+              className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>{isBn ? 'ড্যাশবোর্ডে প্রবেশ করুন' : 'Go to Dashboard'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        ) : currentUser && !isAdmin ? (
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs flex items-center gap-3 text-left">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <div>
-                <div className="font-bold">অননুমোদিত একাউন্ট ({currentUser.email})</div>
-                <div className="text-[11px] text-amber-300 mt-1">
-                  এই ইমেইলটি ক্লাবের অনুমোদিত অ্যাডমিন তালিকায় নেই। অনুগ্রহ করে ক্লাবের মূল ইমেইল{' '}
-                  <span className="font-mono text-white">chotokhatasportingclub@gmail.com</span> অথবা দায়িত্বপ্রাপ্ত অ্যাডমিন দিয়ে লগইন করুন।
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleGoogleLogin}
-              className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition cursor-pointer"
-            >
-              ভিন্ন একাউন্টে লগইন করুন
+              <RefreshCw className="w-4 h-4" />
+              <span>সঠিক অ্যাডমিন একাউন্টে পরিবর্তন করুন</span>
             </button>
           </div>
         ) : (
           <div className="space-y-4">
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-left mb-4">
-                {error}
+            {/* Detailed Diagnostic Error Box if an error occurred */}
+            {errorDetails && (
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs text-left space-y-2 mb-4 animate-fade-in">
+                <div className="flex items-center gap-2 font-bold text-rose-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorDetails.title}</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  {errorDetails.message}
+                </p>
+
+                {errorDetails.steps && errorDetails.steps.length > 0 && (
+                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-1.5 mt-2">
+                    <span className="font-bold text-[11px] text-amber-400 block">কীভাবে ঠিক করবেন (সমাধান):</span>
+                    <ol className="list-decimal list-inside space-y-1 text-[10px] text-slate-300">
+                      {errorDetails.steps.map((step, idx) => (
+                        <li key={idx} className="leading-normal">{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
             )}
 
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full py-3.5 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shadow-xl transition cursor-pointer flex items-center justify-center gap-3"
+              className="w-full py-3.5 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-sm shadow-xl transition cursor-pointer flex items-center justify-center gap-3 disabled:opacity-60"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -125,8 +194,8 @@ export const AdminLogin: React.FC = () => {
             </button>
 
             <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-500">
-              {isBn ? 'স্বীকৃত সুপার অ্যাডমিন:' : 'Designated Super Admin:'}{' '}
-              <span className="font-mono text-slate-400">chotokhatasportingclub@gmail.com</span>
+              {isBn ? 'অনুমোদিত সুপার অ্যাডমিন:' : 'Designated Super Admin:'}{' '}
+              <span className="font-mono text-emerald-400 font-semibold">chotokhatasportingclub@gmail.com</span>
             </div>
           </div>
         )}

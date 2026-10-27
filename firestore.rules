@@ -26,7 +26,9 @@ service cloud.firestore {
     }
 
     function isOwnerEmail() {
-      return isSignedIn() && request.auth.token.email == 'chotokhatasportingclub@gmail.com';
+      return isSignedIn() &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'chotokhatasportingclub@gmail.com';
     }
 
     function isAdmin() {
@@ -38,79 +40,106 @@ service cloud.firestore {
 
     // Site settings: public read, admin write
     match /siteSettings/{settingId} {
-      allow read: if isValidId(settingId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(settingId);
     }
 
     // Hero banners: public read, admin write
     match /banners/{bannerId} {
-      allow read: if isValidId(bannerId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(bannerId);
     }
 
     // Homepage sections: public read, admin write
     match /homepageSections/{sectionId} {
-      allow read: if isValidId(sectionId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(sectionId);
     }
 
     // Players squad: public read, admin write
     match /players/{playerId} {
-      allow read: if isValidId(playerId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(playerId);
     }
 
     // Teams: public read, admin write
     match /teams/{teamId} {
-      allow read: if isValidId(teamId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(teamId);
     }
 
     // Matches and fixtures: public read, admin write
     match /matches/{matchId} {
-      allow read: if isValidId(matchId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(matchId);
+    }
+
+    // Sport and Cultural Categories: public read, admin write
+    match /sportCategories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidId(catId);
+    }
+
+    // Match tactical lineups and squad boards: public read, admin write
+    match /matchLineups/{lineupId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidId(lineupId);
+    }
+
+    // Custom friendly squads (Player Squad Builder): public read, create/update with valid schema, delete
+    match /customSquads/{squadId} {
+      allow read: if true;
+      allow create, update: if isValidId(squadId) &&
+        incoming().squadName is string && incoming().squadName.size() > 0 && incoming().squadName.size() <= 150 &&
+        incoming().formation is string && incoming().formation.size() <= 20;
+      allow delete: if isValidId(squadId);
+    }
+
+    // System initialization metadata: admin read/write
+    match /system/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidId(docId);
     }
 
     // Tournaments: public read, admin write
     match /tournaments/{tournamentId} {
-      allow read: if isValidId(tournamentId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(tournamentId);
     }
 
     // League standings: public read, admin write
     match /standings/{standingId} {
-      allow read: if isValidId(standingId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(standingId);
     }
 
     // Gallery albums: public read, admin write
     match /galleryAlbums/{albumId} {
-      allow read: if isValidId(albumId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(albumId);
     }
 
     // Gallery media: public read, admin write
     match /galleryMedia/{mediaId} {
-      allow read: if isValidId(mediaId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(mediaId);
     }
 
     // News and announcements: public read published, admin can read drafts and write
     match /news/{newsId} {
-      allow read: if isValidId(newsId) && (resource.data.status == 'published' || isAdmin());
+      allow read: if (resource == null || resource.data.status == 'published' || isAdmin());
       allow write: if isAdmin() && isValidId(newsId);
     }
 
     // Achievements and trophies: public read, admin write
     match /achievements/{achievementId} {
-      allow read: if isValidId(achievementId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(achievementId);
     }
 
     // Sponsors: public read, admin write
     match /sponsors/{sponsorId} {
-      allow read: if isValidId(sponsorId);
+      allow read: if true;
       allow write: if isAdmin() && isValidId(sponsorId);
     }
 

@@ -12,6 +12,7 @@ import {
   Heart,
   Lock,
 } from 'lucide-react';
+import { DEFAULT_LOGO_SVG } from '../../services/db';
 
 export const Footer: React.FC = () => {
   const { settings, language, setCurrentRoute, isAdmin } = useApp();
@@ -63,7 +64,7 @@ export const Footer: React.FC = () => {
           {/* Column 1: About */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 object-contain" />
+              <img src={settings.logoUrl || DEFAULT_LOGO_SVG} alt="Logo" className="w-10 h-10 object-contain" />
               <div>
                 <h5 className="text-white font-bold text-base leading-tight">
                   {settings.shortName}

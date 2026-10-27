@@ -107,8 +107,15 @@ export const Gallery: React.FC = () => {
                 className="group relative aspect-4/3 rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 hover:border-emerald-500/50 shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
               >
                 <img
-                  src={item.url}
+                  src={item.url || 'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=800&auto=format&fit=crop'}
                   alt={item.title}
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (!target.dataset.hasFallenBack) {
+                      target.dataset.hasFallenBack = 'true';
+                      target.src = 'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=800&auto=format&fit=crop';
+                    }
+                  }}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
@@ -170,8 +177,15 @@ export const Gallery: React.FC = () => {
           <div className="max-w-4xl max-h-[85vh] w-full flex flex-col items-center">
             <div className="max-h-[70vh] overflow-hidden rounded-2xl border border-slate-800 flex items-center justify-center bg-slate-950">
               <img
-                src={filteredMedia[lightboxIndex].url}
+                src={filteredMedia[lightboxIndex].url || 'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=1200&auto=format&fit=crop'}
                 alt={filteredMedia[lightboxIndex].title}
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.dataset.hasFallenBack) {
+                    target.dataset.hasFallenBack = 'true';
+                    target.src = 'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?q=80&w=1200&auto=format&fit=crop';
+                  }
+                }}
                 className="max-h-[70vh] w-auto max-w-full object-contain"
               />
             </div>

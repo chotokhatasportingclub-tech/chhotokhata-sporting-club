@@ -43,8 +43,8 @@ export const About: React.FC = () => {
               <p>{isBn ? settings.history : settings.historyEn || settings.history}</p>
               <p>
                 {isBn
-                  ? 'ছোটখাতা ফুটবল ময়দান সবসময়ই এলাকার প্রাণকেন্দ্র। প্রতি বছর বিভিন্ন টুর্নামেন্টে অংশগ্রহণের পাশাপাশি আমাদের নিজস্ব গ্রাউন্ডে আন্তঃউপজেলা ও গোল্ডকাপ টুর্নামেন্ট আয়োজন করে আমরা উত্তরবঙ্গের ফুটবলে দৃষ্টান্ত স্থাপন করে চলেছি।'
-                  : 'Chhotokhata football ground has always been the heartbeat of our sports community. Our academy nurtures young talent through disciplined coaching, sportsmanship, and passion.'}
+                  ? 'ছোটখাতা চৌপথী খেলার মাঠ ও ক্লাব প্রাঙ্গণ সবসময়ই এলাকার ক্রীড়া ও সংস্কৃতির প্রাণকেন্দ্র। ফুটবল, ক্রিকেট, ব্যাডমিন্টন, ভলিবল, অ্যাথলেটিক্স প্রতিযোগিতা এবং বার্ষিক সাংস্কৃতিক ও নাট্যোৎসব আয়োজনের মাধ্যমে আমাদের ক্লাব উত্তরবঙ্গে সুস্থ সংস্কৃতি ও ক্রীড়াচর্চার এক উজ্জ্বল দৃষ্টান্ত স্থাপন করে চলেছে।'
+                  : 'Chhotokhata Choupathi sports ground and club premises have always been the heartbeat of regional athletics and culture. Through football, cricket, badminton, volleyball, athletics meets, and traditional cultural festivals, the club sets an exemplary standard for youth empowerment.'}
               </p>
             </div>
           </div>

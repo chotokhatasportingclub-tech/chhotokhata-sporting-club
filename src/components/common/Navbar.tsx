@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
+import { DEFAULT_LOGO_SVG } from '../../services/db';
 
 export const Navbar: React.FC = () => {
   const { settings, language, setLanguage, currentRoute, setCurrentRoute, currentUser, isAdmin } = useApp();
@@ -27,6 +28,8 @@ export const Navbar: React.FC = () => {
     { key: 'home', labelBn: 'হোম', labelEn: 'Home' },
     { key: 'about', labelBn: 'ক্লাব পরিচিতি', labelEn: 'About' },
     { key: 'players', labelBn: 'খেলোয়াড় স্কোয়াড', labelEn: 'Squad' },
+    { key: 'lineup', labelBn: 'ম্যাচ লাইনআপ', labelEn: 'Lineup' },
+    { key: 'squad-builder', labelBn: 'দল তৈরি করুন', labelEn: 'Squad Builder' },
     { key: 'matches', labelBn: 'ম্যাচ ও ফলাফল', labelEn: 'Fixtures' },
     { key: 'standings', labelBn: 'পয়েন্ট টেবিল', labelEn: 'Standings' },
     { key: 'tournaments', labelBn: 'টুর্নামেন্ট', labelEn: 'Tournaments' },
@@ -99,7 +102,7 @@ export const Navbar: React.FC = () => {
           >
             <div className={`relative shrink-0 ${logoDimensions} transition-transform group-hover:scale-105`}>
               <img
-                src={settings.logoUrl}
+                src={settings.logoUrl || DEFAULT_LOGO_SVG}
                 alt={settings.clubNameBn}
                 className="w-full h-full object-contain drop-shadow-md"
               />

@@ -13,9 +13,11 @@ import { Gallery } from './pages/public/Gallery';
 import { News } from './pages/public/News';
 import { Achievements } from './pages/public/Achievements';
 import { Contact } from './pages/public/Contact';
+import { LineupPage } from './pages/public/LineupPage';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Shield, Loader2 } from 'lucide-react';
+import { DEFAULT_LOGO_SVG } from './services/db';
 
 const MainContent: React.FC = () => {
   const { currentRoute, isAdmin, currentUser, loading, settings } = useApp();
@@ -25,7 +27,7 @@ const MainContent: React.FC = () => {
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
         <div className="relative mb-6">
           <img
-            src={settings.logoUrl}
+            src={settings.logoUrl || DEFAULT_LOGO_SVG}
             alt="Club Logo"
             className="w-20 h-20 object-contain drop-shadow-2xl animate-pulse"
           />
@@ -66,6 +68,10 @@ const MainContent: React.FC = () => {
         return <About />;
       case 'players':
         return <Players />;
+      case 'lineup':
+        return <LineupPage initialTab="board" />;
+      case 'squad-builder':
+        return <LineupPage initialTab="builder" />;
       case 'matches':
         return <Matches />;
       case 'standings':

@@ -5,6 +5,7 @@ import { uploadMedia } from '../../services/storage';
 interface ImageUploaderProps {
   value?: string;
   onChange: (url: string) => void;
+  onUploadingChange?: (isUploading: boolean) => void;
   folder?: string;
   label?: string;
   aspectHint?: string;
@@ -14,6 +15,7 @@ interface ImageUploaderProps {
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   value = '',
   onChange,
+  onUploadingChange,
   folder = 'uploads',
   label = 'ছবি আপলোড করুন',
   aspectHint = 'JPG, PNG, WebP বা SVG (সর্বোচ্চ ১০ মেগাবাইট)',
@@ -32,17 +34,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     setError(null);
     setIsUploading(true);
-    setProgress(5);
+    onUploadingChange?.(true);
+    setProgress(0);
 
     try {
       const url = await uploadMedia(folder, file, (p) => {
         setProgress(p);
       });
       onChange(url);
+      setError(null);
     } catch (err: any) {
-      setError(err.message || 'আপলোড ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন।');
+      console.warn('Upload error in ImageUploader:', err);
+      setError(err?.message || 'আপলোড ব্যর্থ হয়েছে। পুনরায় চেষ্টা করুন বা URL যুক্ত করুন।');
     } finally {
       setIsUploading(false);
+      onUploadingChange?.(false);
       setProgress(0);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -63,7 +69,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     <div className={`space-y-2 ${className}`}>
       {label && <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">{label}</label>}
 
-      {value ? (
+      {value && value.trim() !== '' ? (
         <div className="relative group rounded-xl overflow-hidden border border-slate-700 bg-slate-900/60 p-2 flex items-center gap-4">
           <div className="w-20 h-20 rounded-lg overflow-hidden bg-slate-950 flex items-center justify-center shrink-0 border border-slate-800">
             <img src={value} alt="Preview" className="w-full h-full object-contain" />
@@ -154,7 +160,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         </div>
       )}
 
-      {error && <div className="text-xs text-rose-400 mt-1">{error}</div>}
+      {error && (
+        <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 mt-2 flex items-start justify-between gap-2">
+          <span className="flex-1">{error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setShowUrlInput(true);
+            }}
+            className="shrink-0 text-emerald-400 underline font-semibold hover:text-emerald-300 cursor-pointer text-[11px]"
+          >
+            URL দিন
+          </button>
+        </div>
+      )}
 
       <input
         ref={fileInputRef}

@@ -12,19 +12,44 @@ import {
   AlertCircle,
   CheckCircle,
 } from 'lucide-react';
+import { DEFAULT_LOGO_SVG } from '../../services/db';
+import { SquadBoard } from '../../components/lineup/SquadBoard';
 
 export const Matches: React.FC = () => {
-  const { matches, settings, language } = useApp();
+  const {
+    matches,
+    players,
+    settings,
+    sportCategories,
+    selectedSportFilter,
+    setSelectedSportFilter,
+    language,
+    setCurrentRoute,
+    isAdmin,
+    showToast,
+    refreshAllData,
+  } = useApp();
   const isBn = language === 'bn';
 
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'completed' | 'live'>('all');
   const [selectedMatchModal, setSelectedMatchModal] = useState<Match | null>(null);
+  const [selectedLineupMatch, setSelectedLineupMatch] = useState<Match | null>(null);
 
   const filteredMatches = matches.filter((m) => {
-    if (activeTab === 'upcoming') return m.status === 'Upcoming';
-    if (activeTab === 'completed') return m.status === 'Completed';
-    if (activeTab === 'live') return m.status === 'Live';
-    return true;
+    // Sport match
+    const mSport = m.sport || 'football';
+    const matchSport =
+      selectedSportFilter === 'all' ||
+      mSport === selectedSportFilter ||
+      (selectedSportFilter === 'football' && !m.sport);
+
+    // Status match
+    let matchStatus = true;
+    if (activeTab === 'upcoming') matchStatus = m.status === 'Upcoming';
+    else if (activeTab === 'completed') matchStatus = m.status === 'Completed';
+    else if (activeTab === 'live') matchStatus = m.status === 'Live';
+
+    return matchSport && matchStatus;
   });
 
   const liveMatches = matches.filter((m) => m.status === 'Live');
@@ -32,19 +57,62 @@ export const Matches: React.FC = () => {
   return (
     <div className="min-h-screen py-16 animate-fade-in">
       {/* Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 text-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 text-center">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-4">
           <Calendar className="w-4 h-4" />
           <span>{isBn ? 'ফিক্সচার ও ফলাফল' : 'Fixtures & Match Center'}</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-4">
-          {isBn ? 'ছোটখাতা স্পোর্টিং ক্লাব ফুটবল ম্যাচ' : 'Matches & Official Results'}
+        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-4">
+          {isBn ? `${settings.clubNameBn} - ম্যাচ ও সময়সূচী` : `${settings.clubNameEn} - Matches & Fixtures`}
         </h1>
-        <p className="text-slate-400 text-base max-w-xl mx-auto">
+        <p className="text-slate-400 text-base max-w-2xl mx-auto mb-6">
           {isBn
-            ? 'আসন্ন টুর্নামেন্টের ম্যাচের সময়সূচী, লাইভ স্কোর এবং সাম্প্রতিক ম্যাচের ফলাফল।'
-            : 'Track upcoming football fixtures, live match scores, and completed match reports.'}
+            ? 'ফুটবল, ক্রিকেট, ব্যাডমিন্টন, ভলিবল সহ সকল ক্রীড়া প্রতিযোগিতা ও সাংস্কৃতিক ইভেন্টের সময়সূচী এবং ফলাফল।'
+            : 'Track upcoming matches, live scoreboards, and official completed results across all disciplines.'}
         </p>
+
+        {/* Top Sport Filter Tabs */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+          <button
+            onClick={() => setSelectedSportFilter('all')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+              selectedSportFilter === 'all'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <span>🏅</span>
+            <span>{isBn ? 'সকল খেলাধুলা' : 'All Sports'}</span>
+          </button>
+          {sportCategories.map((sc) => (
+            <button
+              key={sc.id}
+              onClick={() => setSelectedSportFilter(sc.key)}
+              className={`px-4 py-2 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                selectedSportFilter === sc.key
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950'
+                  : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <span>{sc.iconEmoji}</span>
+              <span>{isBn ? sc.nameBn : sc.nameEn}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Quick Squad Builder CTA */}
+        <div className="inline-flex flex-wrap items-center justify-center gap-3 p-2 px-4 rounded-2xl bg-slate-900/90 border border-emerald-500/30 text-xs shadow-xl">
+          <span className="text-slate-300 font-semibold">
+            {isBn ? 'বন্ধুত্বপূর্ণ বা কাস্টম ম্যাচের জন্য একাদশ সাজাতে চান?' : 'Want to create a squad for a friendly match?'}
+          </span>
+          <button
+            onClick={() => setCurrentRoute('squad-builder')}
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-300" />
+            <span>{isBn ? 'দল তৈরি করুন (Squad Builder)' : 'Build Custom Squad'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -63,7 +131,7 @@ export const Matches: React.FC = () => {
             <div className="flex items-center justify-around py-4">
               <div className="text-center flex-1">
                 <img
-                  src={liveMatches[0].homeTeamLogo || settings.logoUrl}
+                  src={liveMatches[0].homeTeamLogo || settings.logoUrl || DEFAULT_LOGO_SVG}
                   alt=""
                   className="w-16 h-16 object-contain mx-auto mb-2 drop-shadow"
                 />
@@ -83,7 +151,7 @@ export const Matches: React.FC = () => {
 
               <div className="text-center flex-1">
                 <img
-                  src={liveMatches[0].awayTeamLogo || settings.logoUrl}
+                  src={liveMatches[0].awayTeamLogo || settings.logoUrl || DEFAULT_LOGO_SVG}
                   alt=""
                   className="w-16 h-16 object-contain mx-auto mb-2 drop-shadow"
                 />
@@ -196,18 +264,30 @@ export const Matches: React.FC = () => {
                       {match.homeTeamName}
                     </span>
                     <img
-                      src={match.homeTeamLogo || settings.logoUrl}
+                      src={match.homeTeamLogo || settings.logoUrl || DEFAULT_LOGO_SVG}
                       alt={match.homeTeamName}
                       className="w-12 h-12 object-contain rounded-2xl bg-slate-950 p-2 border border-slate-800 shrink-0 order-1 md:order-2"
                     />
                   </div>
 
                   {/* Score / Time Box */}
-                  <div className="md:col-span-1 text-center py-2">
+                  <div className="md:col-span-1 text-center py-2 flex flex-col items-center justify-center">
                     {match.status === 'Completed' || match.status === 'Live' ? (
-                      <div className="inline-block px-4 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xl font-black text-amber-400 font-mono">
-                        {match.homeScore ?? 0} - {match.awayScore ?? 0}
-                      </div>
+                      match.homeScoreDisplay || match.awayScoreDisplay ? (
+                        <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-center min-w-[100px]">
+                          <div className="text-sm font-black text-amber-400 font-mono leading-tight">
+                            {match.homeScoreDisplay || `${match.homeScore ?? 0}`}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold uppercase my-0.5">বনাম</div>
+                          <div className="text-sm font-black text-amber-400 font-mono leading-tight">
+                            {match.awayScoreDisplay || `${match.awayScore ?? 0}`}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="inline-block px-4 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xl font-black text-amber-400 font-mono">
+                          {match.homeScore ?? 0} - {match.awayScore ?? 0}
+                        </div>
+                      )
                     ) : (
                       <div className="text-xs font-black text-emerald-400 uppercase tracking-widest bg-slate-950 py-1.5 px-3 rounded-xl border border-slate-800 inline-block">
                         VS
@@ -218,7 +298,7 @@ export const Matches: React.FC = () => {
                   {/* Away Team */}
                   <div className="md:col-span-3 flex items-center justify-start gap-3 text-left">
                     <img
-                      src={match.awayTeamLogo || settings.logoUrl}
+                      src={match.awayTeamLogo || settings.logoUrl || DEFAULT_LOGO_SVG}
                       alt={match.awayTeamName}
                       className="w-12 h-12 object-contain rounded-2xl bg-slate-950 p-2 border border-slate-800 shrink-0"
                     />
@@ -228,36 +308,92 @@ export const Matches: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Event Details / Performer Info (if recorded) */}
+                {match.roundOrEventDetails && (
+                  <div className="mt-3 text-xs text-amber-300 bg-amber-950/30 p-2.5 rounded-xl border border-amber-800/40 flex items-center gap-2">
+                    <span className="font-bold text-amber-400">বিবরণ / পর্ব:</span>
+                    <span>{match.roundOrEventDetails}</span>
+                  </div>
+                )}
+
                 {/* Scorers Preview (if recorded) */}
                 {match.scorers && (
                   <div className="mt-3 text-xs text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60">
-                    <span className="text-emerald-400 font-semibold mr-1.5">{isBn ? 'গোলদাতা:' : 'Scorers:'}</span>
+                    <span className="text-emerald-400 font-semibold mr-1.5">{isBn ? 'গোলদাতা / পারফর্মার:' : 'Scorers / Performers:'}</span>
                     <span>{match.scorers}</span>
                   </div>
                 )}
 
-                {/* Footer info: Venue & Match Report Button */}
+                {/* Footer info: Venue & Action Buttons */}
                 <div className="mt-4 pt-3 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
                   <div className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                     <span>{match.venue}</span>
                   </div>
 
-                  {match.report && (
+                  <div className="flex items-center gap-3">
                     <button
-                      onClick={() => setSelectedMatchModal(match)}
-                      className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                      onClick={() => setSelectedLineupMatch(match)}
+                      className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 cursor-pointer bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/20 hover:bg-amber-500/20 transition"
                     >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>{isBn ? 'ম্যাচ রিপোর্ট পড়ুন' : 'Read Match Report'}</span>
+                      <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isBn ? 'লাইনআপ দেখুন' : 'View Lineup'}</span>
                     </button>
-                  )}
+
+                    {match.report && (
+                      <button
+                        onClick={() => setSelectedMatchModal(match)}
+                        className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>{isBn ? 'রিপোর্ট' : 'Report'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Tactical Lineup Modal */}
+      {selectedLineupMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full p-4 sm:p-6 shadow-2xl relative text-left my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <div>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-widest block">
+                  ম্যাচ ট্যাকটিক্যাল একাদশ
+                </span>
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  {selectedLineupMatch.homeTeamName} vs {selectedLineupMatch.awayTeamName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedLineupMatch(null)}
+                className="w-9 h-9 rounded-full bg-slate-950 text-slate-400 hover:text-white flex items-center justify-center border border-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <SquadBoard
+              match={selectedLineupMatch}
+              allPlayers={players}
+              allMatches={matches}
+              isEditable={isAdmin}
+              clubLogo={settings.logoUrl || DEFAULT_LOGO_SVG}
+              clubNameBn={settings.clubNameBn}
+              clubNameEn={settings.clubNameEn}
+              showToast={showToast}
+              onSaveSuccess={async () => {
+                await refreshAllData();
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Match Report Modal */}
       {selectedMatchModal && (

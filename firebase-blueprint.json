@@ -269,6 +269,42 @@
         "timestamp": { "type": "string", "maxLength": 50, "description": "Timestamp string" }
       },
       "required": ["action", "adminEmail", "timestamp"]
+    },
+    "MatchLineup": {
+      "title": "MatchLineup",
+      "description": "Tactical match starting XI lineup and substitutes board",
+      "type": "object",
+      "properties": {
+        "matchId": { "type": "string", "maxLength": 128, "description": "Associated match ID" },
+        "matchType": { "type": "string", "maxLength": 50, "description": "League, Tournament, Friendly, Custom" },
+        "formation": { "type": "string", "maxLength": 20, "description": "4-3-3, 4-4-2, 3-5-2, 4-2-3-1" },
+        "teamName": { "type": "string", "maxLength": 150, "description": "Display team name at top of board" },
+        "coachName": { "type": "string", "maxLength": 150, "description": "Coach or manager name" },
+        "tacticalNotes": { "type": "string", "maxLength": 1000, "description": "Tactical instructions" },
+        "startingXI": { "type": "array", "description": "List of 11 starting lineup player positions and slot assignments" },
+        "substitutes": { "type": "array", "description": "List of bench substitutes" },
+        "updatedAt": { "type": "string", "maxLength": 50, "description": "Last updated timestamp" }
+      },
+      "required": ["matchId", "formation", "startingXI", "substitutes"]
+    },
+    "CustomSquad": {
+      "title": "CustomSquad",
+      "description": "User-built squad for friendly and exhibition matches",
+      "type": "object",
+      "properties": {
+        "squadName": { "type": "string", "maxLength": 150, "description": "Custom squad or team name" },
+        "formation": { "type": "string", "maxLength": 20, "description": "4-3-3, 4-4-2, 3-5-2" },
+        "matchType": { "type": "string", "maxLength": 50, "description": "Friendly, Custom, League, Tournament" },
+        "selectedPlayerIds": { "type": "array", "description": "IDs of selected players from registered player database" },
+        "startingXI": { "type": "array", "description": "11 Starting XI tactical pitch slot assignments" },
+        "substitutes": { "type": "array", "description": "Bench substitute player IDs" },
+        "captainId": { "type": "string", "maxLength": 128, "description": "Selected squad captain player ID" },
+        "notes": { "type": "string", "maxLength": 1000, "description": "Custom squad notes" },
+        "createdBy": { "type": "string", "maxLength": 128, "description": "Creator user UID or email" },
+        "createdAt": { "type": "string", "maxLength": 50, "description": "Created timestamp" },
+        "updatedAt": { "type": "string", "maxLength": 50, "description": "Updated timestamp" }
+      },
+      "required": ["squadName", "formation", "selectedPlayerIds"]
     }
   },
   "firestore": {
@@ -295,6 +331,14 @@
     "/matches/{matchId}": {
       "schema": "#/entities/Match",
       "description": "Fixtures, live match status, and match results"
+    },
+    "/matchLineups/{lineupId}": {
+      "schema": "#/entities/MatchLineup",
+      "description": "Match tactical lineup boards and bench substitutes"
+    },
+    "/customSquads/{squadId}": {
+      "schema": "#/entities/CustomSquad",
+      "description": "Custom squads created by users for friendly matches and squad builder"
     },
     "/tournaments/{tournamentId}": {
       "schema": "#/entities/Tournament",

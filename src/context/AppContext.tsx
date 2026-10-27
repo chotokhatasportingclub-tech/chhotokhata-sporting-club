@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import {
   SiteSettings,
   Language,
@@ -16,6 +17,7 @@ import {
   Sponsor,
   GalleryMedia,
   AdminUser,
+  SportCategory,
 } from '../types';
 import {
   fetchSiteSettings,
@@ -31,6 +33,7 @@ import {
   fetchSponsors,
   fetchGalleryMedia,
   fetchAdmins,
+  fetchSportCategories,
   DEFAULT_SETTINGS,
   DEFAULT_SECTIONS,
   DEFAULT_BANNERS,
@@ -43,6 +46,7 @@ import {
   DEFAULT_ACHIEVEMENTS,
   DEFAULT_SPONSORS,
   DEFAULT_GALLERY,
+  DEFAULT_SPORT_CATEGORIES,
   seedInitialDataToFirestore,
 } from '../services/db';
 
@@ -59,6 +63,7 @@ interface AppContextType {
   updateSettingsState: (newSettings: Partial<SiteSettings>) => void;
   banners: Banner[];
   sections: HomepageSection[];
+  sportCategories: SportCategory[];
   players: Player[];
   teams: Team[];
   matches: Match[];
@@ -74,6 +79,8 @@ interface AppContextType {
   adminUsers: AdminUser[];
   currentRoute: string;
   setCurrentRoute: (route: string) => void;
+  selectedSportFilter: string;
+  setSelectedSportFilter: (sport: string) => void;
   toasts: ToastMessage[];
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
@@ -90,6 +97,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [banners, setBanners] = useState<Banner[]>(DEFAULT_BANNERS);
   const [sections, setSections] = useState<HomepageSection[]>(DEFAULT_SECTIONS);
+  const [sportCategories, setSportCategories] = useState<SportCategory[]>(DEFAULT_SPORT_CATEGORIES);
   const [players, setPlayers] = useState<Player[]>(DEFAULT_PLAYERS);
   const [teams, setTeams] = useState<Team[]>(DEFAULT_TEAMS);
   const [matches, setMatches] = useState<Match[]>(DEFAULT_MATCHES);
@@ -100,6 +108,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [sponsors, setSponsors] = useState<Sponsor[]>(DEFAULT_SPONSORS);
   const [gallery, setGallery] = useState<GalleryMedia[]>(DEFAULT_GALLERY);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [selectedSportFilter, setSelectedSportFilter] = useState<string>('all');
   
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -152,13 +161,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        const ownerEmail = 'chotokhatasportingclub@gmail.com';
+        const ownerEmail = 'chotokhatasportingclub@gmail.com'.toLowerCase().trim();
+        const userEmail = (user.email || '').toLowerCase().trim();
         const admins = await fetchAdmins();
         setAdminUsers(admins);
         const hasAdminRole =
-          user.email === ownerEmail ||
-          admins.some((a) => a.email.toLowerCase() === user.email?.toLowerCase());
+          userEmail === ownerEmail ||
+          admins.some((a) => (a.email || '').toLowerCase().trim() === userEmail);
         setIsAdmin(hasAdminRole);
+
+        // Sync admin doc in Firestore if user is verified admin
+        if (hasAdminRole && user.uid) {
+          try {
+            await setDoc(doc(db, 'admins', user.uid), {
+              email: user.email,
+              role: userEmail === ownerEmail ? 'super_admin' : 'admin',
+              lastLogin: new Date().toISOString(),
+            }, { merge: true });
+          } catch (err) {
+            console.warn('Could not sync admin document:', err);
+          }
+        }
       } else {
         setIsAdmin(false);
       }
@@ -174,6 +197,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sSettings,
         sBanners,
         sSections,
+        sSportCategories,
         sPlayers,
         sTeams,
         sMatches,
@@ -188,6 +212,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         fetchSiteSettings(),
         fetchBanners(),
         fetchHomepageSections(),
+        fetchSportCategories(),
         fetchPlayers(),
         fetchTeams(),
         fetchMatches(),
@@ -203,6 +228,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSettings(sSettings);
       setBanners(sBanners);
       setSections(sSections);
+      setSportCategories(sSportCategories);
       setPlayers(sPlayers);
       setTeams(sTeams);
       setMatches(sMatches);
@@ -216,9 +242,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Verify admin status again if user logged in
       if (auth.currentUser) {
+        const ownerEmail = 'chotokhatasportingclub@gmail.com'.toLowerCase().trim();
+        const curEmail = (auth.currentUser.email || '').toLowerCase().trim();
         const isAdm =
-          auth.currentUser.email === 'chotokhatasportingclub@gmail.com' ||
-          sAdmins.some((a) => a.email.toLowerCase() === auth.currentUser?.email?.toLowerCase());
+          curEmail === ownerEmail ||
+          sAdmins.some((a) => (a.email || '').toLowerCase().trim() === curEmail);
         setIsAdmin(isAdm);
       }
     } catch (err) {
@@ -239,11 +267,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loginWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       const res = await signInWithPopup(auth, provider);
-      showToast(`স্বাগতম, ${res.user.displayName || res.user.email}!`, 'success');
+      
+      const ownerEmail = 'chotokhatasportingclub@gmail.com'.toLowerCase().trim();
+      const userEmail = (res.user.email || '').toLowerCase().trim();
+      const admins = await fetchAdmins();
+      setAdminUsers(admins);
+      const hasAdminRole =
+        userEmail === ownerEmail ||
+        admins.some((a) => (a.email || '').toLowerCase().trim() === userEmail);
+
+      setCurrentUser(res.user);
+      setIsAdmin(hasAdminRole);
+
+      if (hasAdminRole && res.user.uid) {
+        try {
+          await setDoc(doc(db, 'admins', res.user.uid), {
+            email: res.user.email,
+            role: userEmail === ownerEmail ? 'super_admin' : 'admin',
+            lastLogin: new Date().toISOString(),
+          }, { merge: true });
+        } catch (e) {
+          console.warn('Could not update admin doc in firestore:', e);
+        }
+        showToast(`স্বাগতম, ${res.user.displayName || res.user.email}!`, 'success');
+      } else {
+        showToast('এই একাউন্টটি ক্লাবের অনুমোদিত অ্যাডমিন তালিকায় নেই।', 'error');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       showToast(`লগইন ব্যর্থ হয়েছে: ${error.message}`, 'error');
+      throw error;
     }
   };
 
@@ -280,6 +335,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateSettingsState,
         banners,
         sections,
+        sportCategories,
         players,
         teams,
         matches,
@@ -295,6 +351,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         adminUsers,
         currentRoute,
         setCurrentRoute,
+        selectedSportFilter,
+        setSelectedSportFilter,
         toasts,
         showToast,
         removeToast,

@@ -15,6 +15,7 @@ import {
   Sponsor,
   ContactMessage,
   AdminUser,
+  SportCategory,
 } from '../../types';
 import {
   saveSiteSettings,
@@ -39,12 +40,16 @@ import {
   deleteAchievement,
   saveSponsor,
   deleteSponsor,
+  saveSportCategory,
+  deleteSportCategory,
   updateContactMessageStatus,
   deleteContactMessage,
   fetchContactMessages,
   addAdminUser,
   removeAdminUser,
   fetchAuditLogs,
+  syncOfficialSquadToFirestore,
+  DEFAULT_LOGO_SVG,
   DEFAULT_SETTINGS,
   DEFAULT_SECTIONS,
   DEFAULT_BANNERS,
@@ -56,9 +61,13 @@ import {
   DEFAULT_ACHIEVEMENTS,
   DEFAULT_SPONSORS,
   DEFAULT_GALLERY,
+  DEFAULT_SPORT_CATEGORIES,
 } from '../../services/db';
 import { ImageUploader } from '../../components/common/ImageUploader';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { SquadBoard } from '../../components/lineup/SquadBoard';
+import { SquadBuilder } from '../../components/lineup/SquadBuilder';
+import { PlayerKitBadge } from '../../components/lineup/PlayerKitBadge';
 import {
   LayoutDashboard,
   Settings,
@@ -83,6 +92,7 @@ import {
   LogOut,
   Save,
   Plus,
+  PlusCircle,
   Trash2,
   Edit,
   ArrowUp,
@@ -96,6 +106,8 @@ import {
   ChevronRight,
   Menu,
   X,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -104,6 +116,7 @@ export const AdminDashboard: React.FC = () => {
     updateSettingsState,
     banners,
     sections,
+    sportCategories,
     players,
     teams,
     matches,
@@ -135,7 +148,18 @@ export const AdminDashboard: React.FC = () => {
 
   // Editing Modals / Forms
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+
+  const [editingSportCategory, setEditingSportCategory] = useState<SportCategory | null>(null);
+  const [isSavingSportCategory, setIsSavingSportCategory] = useState(false);
+
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [isSavingPlayer, setIsSavingPlayer] = useState(false);
+  const [isUploadingPlayer, setIsUploadingPlayer] = useState(false);
+
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
@@ -145,6 +169,14 @@ export const AdminDashboard: React.FC = () => {
   const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null);
   const [editingSponsor, setEditingSponsor] = useState<Sponsor | null>(null);
   const [newAdminEmail, setNewAdminEmail] = useState('');
+
+  // Sections management state
+  const [sectionsForm, setSectionsForm] = useState<HomepageSection[]>([...sections]);
+  const [isSavingSections, setIsSavingSections] = useState(false);
+
+  React.useEffect(() => {
+    setSectionsForm([...sections]);
+  }, [sections]);
 
   // Messages state
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -166,6 +198,33 @@ export const AdminDashboard: React.FC = () => {
     message: '',
     onConfirm: () => {},
   });
+
+  // Official 20-Player Squad Synchronization State
+  const [isSyncingSquad, setIsSyncingSquad] = useState(false);
+  const [syncReport, setSyncReport] = useState<{
+    reused: number;
+    created: number;
+    reusedPlayers: string[];
+    createdPlayers: string[];
+  } | null>(null);
+
+  const handleSyncOfficialSquad = async () => {
+    setIsSyncingSquad(true);
+    setSyncReport(null);
+    try {
+      const res = await syncOfficialSquadToFirestore(DEFAULT_PLAYERS);
+      setSyncReport(res);
+      await refreshAllData();
+      showToast(
+        `২০ জন অফিসিয়াল স্কোয়াড সফলভাবে ক্লাউড ফায়ারস্টোরে সিঙ্ক হয়েছে! (Reused: ${res.reused}, Created: ${res.created})`,
+        'success'
+      );
+    } catch (err: any) {
+      showToast(`স্কোয়াড সিঙ্ক করতে সমস্যা হয়েছে: ${err.message}`, 'error');
+    } finally {
+      setIsSyncingSquad(false);
+    }
+  };
 
   // Sync settings form when global settings change
   React.useEffect(() => {
@@ -220,6 +279,81 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Save Banner Modal handler
+  const handleSaveBannerModal = async () => {
+    if (!editingBanner) return;
+
+    if (!editingBanner.imageUrl || !editingBanner.imageUrl.trim()) {
+      showToast('ব্যানারের মূল ছবি আবশ্যক। অনুগ্রহ করে ছবি আপলোড করুন অথবা সরাসরি ছবির লিংক (URL) দিন।', 'error');
+      return;
+    }
+
+    if (!editingBanner.title.trim()) {
+      showToast('ব্যানারের শিরোনাম আবশ্যক', 'error');
+      return;
+    }
+
+    setIsSavingBanner(true);
+    try {
+      const bannerPayload: Banner = {
+        ...editingBanner,
+        order: Number(editingBanner.order) || (banners.length + 1),
+        overlayOpacity: Number(editingBanner.overlayOpacity) ?? 65,
+        isActive: Boolean(editingBanner.isActive),
+      };
+      await saveBanner(bannerPayload);
+      await refreshAllData();
+      showToast('ব্যানার সফলভাবে সংরক্ষিত হয়েছে!', 'success');
+      setEditingBanner(null);
+    } catch (err: any) {
+      console.error('Save banner error:', err);
+      showToast(`ব্যানার সংরক্ষণে ত্রুটি: ${err.message || 'ব্যর্থ হয়েছে'}`, 'error');
+    } finally {
+      setIsSavingBanner(false);
+    }
+  };
+
+  // Save Player Modal handler
+  const handleSavePlayerModal = async () => {
+    if (!editingPlayer) return;
+
+    if (!editingPlayer.fullName.trim()) {
+      showToast('খেলোয়াড়ের পূর্ণ নাম আবশ্যক', 'error');
+      return;
+    }
+
+    setIsSavingPlayer(true);
+    try {
+      const playerPayload: Player = {
+        ...editingPlayer,
+        sport: editingPlayer.sport || 'football',
+        sportRole: editingPlayer.sportRole || '',
+        runsScored: Number(editingPlayer.runsScored) || 0,
+        wicketsTaken: Number(editingPlayer.wicketsTaken) || 0,
+        personalBest: editingPlayer.personalBest || '',
+        medalsWon: Number(editingPlayer.medalsWon) || 0,
+        culturalGenre: editingPlayer.culturalGenre || '',
+        jerseyNumber: Number(editingPlayer.jerseyNumber) || 1,
+        appearances: Number(editingPlayer.appearances) || 0,
+        goals: Number(editingPlayer.goals) || 0,
+        assists: Number(editingPlayer.assists) || 0,
+        cleanSheets: Number(editingPlayer.cleanSheets) || 0,
+        order: Number(editingPlayer.order) || (players.length + 1),
+        isActive: Boolean(editingPlayer.isActive),
+        isCaptain: Boolean(editingPlayer.isCaptain),
+      };
+      await savePlayer(playerPayload);
+      await refreshAllData();
+      showToast('খেলোয়াড় সফলভাবে সংরক্ষিত হয়েছে!', 'success');
+      setEditingPlayer(null);
+    } catch (err: any) {
+      console.error('Save player error:', err);
+      showToast(`খেলোয়াড় সংরক্ষণে ত্রুটি: ${err.message || 'ব্যর্থ হয়েছে'}`, 'error');
+    } finally {
+      setIsSavingPlayer(false);
+    }
+  };
+
   // Reorder homepage section
   const handleMoveSection = async (index: number, direction: 'up' | 'down') => {
     const newSections = [...sections].sort((a, b) => a.order - b.order);
@@ -249,6 +383,51 @@ export const AdminDashboard: React.FC = () => {
       showToast('সেকশন দৃশ্যমানতা পরিবর্তিত হয়েছে', 'info');
     } catch (err: any) {
       showToast(`ত্রুটি: ${err.message}`, 'error');
+    }
+  };
+
+  // Save Sport Category Modal handler
+  const handleSaveSportCategoryModal = async () => {
+    if (!editingSportCategory) return;
+    if (!editingSportCategory.nameBn.trim()) {
+      showToast('বিভাগের বাংলা নাম আবশ্যক', 'error');
+      return;
+    }
+    setIsSavingSportCategory(true);
+    try {
+      const payload: SportCategory = {
+        ...editingSportCategory,
+        order: Number(editingSportCategory.order) || (sportCategories.length + 1),
+        isActive: Boolean(editingSportCategory.isActive),
+        supportsPointsTable: Boolean(editingSportCategory.supportsPointsTable),
+        allowedPositions: Array.isArray(editingSportCategory.allowedPositions)
+          ? editingSportCategory.allowedPositions
+          : typeof editingSportCategory.allowedPositions === 'string'
+          ? (editingSportCategory.allowedPositions as string).split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
+      };
+      await saveSportCategory(payload);
+      await refreshAllData();
+      showToast('ক্রীড়া/সাংস্কৃতিক বিভাগ সফলভাবে সংরক্ষিত হয়েছে!', 'success');
+      setEditingSportCategory(null);
+    } catch (err: any) {
+      showToast(`বিভাগ সংরক্ষণে ত্রুটি: ${err.message || 'ব্যর্থ হয়েছে'}`, 'error');
+    } finally {
+      setIsSavingSportCategory(false);
+    }
+  };
+
+  // Save modified sections with names and order
+  const handleSaveAllSections = async () => {
+    setIsSavingSections(true);
+    try {
+      await saveHomepageSections(sectionsForm);
+      await refreshAllData();
+      showToast('হোমপেজের সকল সেকশন সেটিংস সফলভাবে সংরক্ষিত হয়েছে!', 'success');
+    } catch (err: any) {
+      showToast(`সেকশন সংরক্ষণে ত্রুটি: ${err.message || 'ব্যর্থ হয়েছে'}`, 'error');
+    } finally {
+      setIsSavingSections(false);
     }
   };
 
@@ -369,7 +548,10 @@ export const AdminDashboard: React.FC = () => {
     { key: 'banners', label: 'হিরো ব্যানার স্লাইডার', icon: Sliders },
     { key: 'theme', label: 'থিম ও কালার স্কিম', icon: Palette },
     { key: 'sections', label: 'হোমপেজ সেকশন নিয়ন্ত্রণ', icon: Layers },
+    { key: 'sports_categories', label: 'ক্রীড়া ও সাংস্কৃতিক বিভাগ', icon: Sparkles, badge: 'All-Sports' },
     { key: 'players', label: 'খেলোয়াড় স্কোয়াড (CRUD)', icon: Users },
+    { key: 'lineup', label: 'ম্যাচ ট্যাকটিক্যাল লাইনআপ', icon: Trophy, badge: 'New' },
+    { key: 'squad_builder', label: 'ফ্রেন্ডলি স্কোয়াড বিল্ডার', icon: PlusCircle, badge: 'Builder' },
     { key: 'matches', label: 'ম্যাচ ও ফলাফল', icon: Calendar },
     { key: 'standings', label: 'পয়েন্ট টেবিল', icon: BarChart3 },
     { key: 'tournaments', label: 'টুর্নামেন্ট সমূহ', icon: Trophy },
@@ -395,7 +577,7 @@ export const AdminDashboard: React.FC = () => {
           >
             {mobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
-          <img src={settings.logoUrl} alt="" className="w-8 h-8 object-contain" />
+          <img src={settings.logoUrl || DEFAULT_LOGO_SVG} alt="" className="w-8 h-8 object-contain" />
           <div>
             <h2 className="text-sm font-bold text-white leading-tight">
               {settings.shortName} অ্যাডমিন প্যানেল
@@ -736,6 +918,7 @@ export const AdminDashboard: React.FC = () => {
                         label="ক্লাবের অফিসিয়াল লোগো পরিবর্তন:"
                         value={settingsForm.logoUrl}
                         onChange={(url) => setSettingsForm({ ...settingsForm, logoUrl: url })}
+                        onUploadingChange={setIsUploadingLogo}
                         folder="club_branding"
                       />
                     </div>
@@ -743,9 +926,22 @@ export const AdminDashboard: React.FC = () => {
                     <div className="pt-4 border-t border-slate-800 flex justify-end">
                       <button
                         onClick={() => handleSaveSettings()}
-                        className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition cursor-pointer"
+                        disabled={isSavingSettings || isUploadingLogo}
+                        className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-2"
                       >
-                        পরিবর্তনগুলো সেভ করুন
+                        {isSavingSettings ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>সংরক্ষণ হচ্ছে...</span>
+                          </>
+                        ) : isUploadingLogo ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>লোগো আপলোড হচ্ছে...</span>
+                          </>
+                        ) : (
+                          <span>পরিবর্তনগুলো সেভ করুন</span>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -981,11 +1177,25 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <button
                     onClick={() => handleSaveSettings()}
-                    disabled={isSavingSettings}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
+                    disabled={isSavingSettings || isUploadingLogo}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
                   >
-                    <Save className="w-4 h-4" />
-                    <span>লোগো সংরক্ষণ করুন</span>
+                    {isSavingSettings ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>সংরক্ষণ হচ্ছে...</span>
+                      </>
+                    ) : isUploadingLogo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>লোগো আপলোড হচ্ছে...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>লোগো সংরক্ষণ করুন</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -994,6 +1204,7 @@ export const AdminDashboard: React.FC = () => {
                     label="ক্লাবের লোগো ফাইল আপলোড করুন (PNG, SVG, WebP)"
                     value={settingsForm.logoUrl}
                     onChange={(url) => setSettingsForm({ ...settingsForm, logoUrl: url })}
+                    onUploadingChange={setIsUploadingLogo}
                     folder="logos"
                     aspectHint="স্বচ্ছ ব্যাকগ্রাউন্ডের (Transparent PNG/SVG) লোগো সুপারিশকৃত"
                   />
@@ -1026,7 +1237,7 @@ export const AdminDashboard: React.FC = () => {
                       ওয়েবসাইট হেডারে প্রিভিউ:
                     </span>
                     <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-xl border border-slate-800">
-                      <img src={settingsForm.logoUrl} alt="" className="h-12 w-12 object-contain" />
+                      <img src={settingsForm.logoUrl || DEFAULT_LOGO_SVG} alt="" className="h-12 w-12 object-contain" />
                       <div>
                         <div className="text-sm font-bold text-white">{settingsForm.clubNameBn}</div>
                         <div className="text-xs text-emerald-400">{settingsForm.shortName}</div>
@@ -1053,7 +1264,7 @@ export const AdminDashboard: React.FC = () => {
                         id: `banner_${Date.now()}`,
                         title: 'নতুন ব্যানার স্লাইড',
                         subtitle: 'ব্যানার বিবরণী এখানে লিখুন',
-                        imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1600&auto=format&fit=crop',
+                        imageUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1600&auto=format&fit=crop',
                         primaryButtonText: 'আমাদের দল দেখুন',
                         primaryButtonLink: '#players',
                         textAlignment: 'center',
@@ -1076,7 +1287,14 @@ export const AdminDashboard: React.FC = () => {
                       className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between"
                     >
                       <div className="relative aspect-16/9 bg-slate-950">
-                        <img src={b.imageUrl} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={b.imageUrl || DEFAULT_BANNERS[0].imageUrl}
+                          alt={b.title || ''}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop';
+                          }}
+                          className="w-full h-full object-cover"
+                        />
                         <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-950/80 backdrop-blur-md text-white border border-slate-700">
                           {b.isActive ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
                         </div>
@@ -1103,10 +1321,15 @@ export const AdminDashboard: React.FC = () => {
                                 title: 'ব্যানার মুছে ফেলুন',
                                 message: 'আপনি কি নিশ্চিত এই ব্যানার স্লাইডটি মুছে ফেলতে চান?',
                                 onConfirm: async () => {
-                                  await deleteBanner(b.id);
-                                  await refreshAllData();
-                                  setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
-                                  showToast('ব্যানার মুছে ফেলা হয়েছে', 'info');
+                                  try {
+                                    await deleteBanner(b.id);
+                                    await refreshAllData();
+                                    setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                    showToast('ব্যানার সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে', 'success');
+                                  } catch (err: any) {
+                                    setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                    showToast(`ব্যানার মুছতে ব্যর্থ হয়েছে: ${err.message || 'ত্রুটি'}`, 'error');
+                                  }
                                 },
                               })
                             }
@@ -1135,6 +1358,7 @@ export const AdminDashboard: React.FC = () => {
                         label="ডেস্কটপ ব্যানার ছবি (Desktop Banner 16:9)"
                         value={editingBanner.imageUrl}
                         onChange={(url) => setEditingBanner({ ...editingBanner, imageUrl: url })}
+                        onUploadingChange={setIsUploadingBanner}
                         folder="banners"
                       />
 
@@ -1142,6 +1366,7 @@ export const AdminDashboard: React.FC = () => {
                         label="মোবাইল ব্যানার ছবি (ঐচ্ছিক Mobile Banner)"
                         value={editingBanner.mobileImageUrl || ''}
                         onChange={(url) => setEditingBanner({ ...editingBanner, mobileImageUrl: url })}
+                        onUploadingChange={setIsUploadingBanner}
                         folder="banners_mobile"
                       />
 
@@ -1230,21 +1455,32 @@ export const AdminDashboard: React.FC = () => {
 
                       <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
                         <button
+                          type="button"
+                          disabled={isSavingBanner || isUploadingBanner}
                           onClick={() => setEditingBanner(null)}
-                          className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs"
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs cursor-pointer"
                         >
                           বাতিল
                         </button>
                         <button
-                          onClick={async () => {
-                            await saveBanner(editingBanner);
-                            await refreshAllData();
-                            setEditingBanner(null);
-                            showToast('ব্যানার সফলভাবে সংরক্ষিত হয়েছে!', 'success');
-                          }}
-                          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                          type="button"
+                          disabled={isSavingBanner || isUploadingBanner}
+                          onClick={handleSaveBannerModal}
+                          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg"
                         >
-                          সংরক্ষণ করুন
+                          {isSavingBanner ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>সংরক্ষণ হচ্ছে...</span>
+                            </>
+                          ) : isUploadingBanner ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>ছবি আপলোড হচ্ছে...</span>
+                            </>
+                          ) : (
+                            <span>সংরক্ষণ করুন</span>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -1399,41 +1635,555 @@ export const AdminDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* 7. PLAYERS MANAGEMENT */}
-            {activeTab === 'players' && (
-              <div className="space-y-6 animate-fade-in">
-                <div className="flex items-center justify-between">
+            {/* 6.1. HOMEPAGE SECTIONS MANAGEMENT */}
+            {activeTab === 'sections' && (
+              <div className="space-y-6 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-xl animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                   <div>
-                    <h2 className="text-xl font-bold text-white">খেলোয়াড় স্কোয়াড ব্যবস্থাপনা</h2>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-emerald-400" />
+                      <span>হোমপেজ সেকশন নিয়ন্ত্রণ ও লেবেল এডিটর</span>
+                    </h2>
                     <p className="text-xs text-slate-400">
-                      ক্লাবের খেলোয়াড়দের ছবি আপলোড, পজিশন, জার্সি নম্বর ও গোল পরিসংখ্যান আপডেট করুন।
+                      কোন কোন সেকশন ওয়েবসাইটে প্রদর্শিত হবে তা চালু বা বন্ধ করুন, সেকশনের শিরোনাম বাংলা ও ইংরেজিতে পরিবর্তন করুন এবং ক্রম সাজান।
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleSaveAllSections}
+                    disabled={isSavingSections}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isSavingSections ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>সেভ হচ্ছে...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>সেকশন সেটিংস সেভ করুন</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {sectionsForm
+                    .sort((a, b) => a.order - b.order)
+                    .map((sec, idx) => (
+                      <div
+                        key={sec.id}
+                        className={`p-4 rounded-2xl border transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                          sec.isVisible
+                            ? 'bg-slate-950 border-slate-800 hover:border-emerald-500/40'
+                            : 'bg-slate-950/40 border-slate-900 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-emerald-400 text-xs font-black flex items-center justify-center font-mono">
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                              Key: {sec.sectionKey}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 w-full md:w-auto">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                              বাংলা শিরোনাম:
+                            </label>
+                            <input
+                              type="text"
+                              value={sec.titleBn}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSectionsForm((prev) =>
+                                  prev.map((s) => (s.id === sec.id ? { ...s, titleBn: val } : s))
+                                );
+                              }}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                              English Title:
+                            </label>
+                            <input
+                              type="text"
+                              value={sec.titleEn}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSectionsForm((prev) =>
+                                  prev.map((s) => (s.id === sec.id ? { ...s, titleEn: val } : s))
+                                );
+                              }}
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 self-end md:self-center">
+                          {/* Visibility Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newVis = !sec.isVisible;
+                              setSectionsForm((prev) =>
+                                prev.map((s) => (s.id === sec.id ? { ...s, isVisible: newVis } : s))
+                              );
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                              sec.isVisible
+                                ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{sec.isVisible ? 'প্রদর্শিত' : 'লুকানো'}</span>
+                          </button>
+
+                          {/* Reorder Buttons */}
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleMoveSection(idx, 'up')}
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 cursor-pointer"
+                              title="উপরে নিন"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === sectionsForm.length - 1}
+                              onClick={() => handleMoveSection(idx, 'down')}
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 cursor-pointer"
+                              title="নিচে নিন"
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* 6.2. ALL-SPORTS & CULTURAL CATEGORIES (CRUD) */}
+            {activeTab === 'sports_categories' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-emerald-400" />
+                      <span>ক্রীড়া ও সাংস্কৃতিক বিভাগসমূহ (All-Sports Categories)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      ফুটবল, ক্রিকেট, ব্যাডমিন্টন, ভলিবল, টেবিল টেনিস, অ্যাথলেটিক্স ও সাংস্কৃতিক কার্যক্রমের বিভাগ কনফিগার করুন।
                     </p>
                   </div>
                   <button
                     onClick={() =>
-                      setEditingPlayer({
-                        id: `player_${Date.now()}`,
-                        fullName: '',
+                      setEditingSportCategory({
+                        id: `sport-${Date.now()}`,
+                        key: `sport_${Date.now()}`,
                         nameBn: '',
-                        jerseyNumber: players.length + 1,
-                        position: 'Forward',
-                        photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop',
-                        bio: '',
-                        appearances: 0,
-                        goals: 0,
-                        assists: 0,
-                        cleanSheets: 0,
+                        nameEn: '',
+                        iconEmoji: '🏅',
+                        descriptionBn: '',
+                        descriptionEn: '',
                         isActive: true,
-                        isCaptain: false,
-                        order: players.length + 1,
+                        order: sportCategories.length + 1,
+                        supportsPointsTable: false,
+                        scoreType: 'goals',
+                        allowedPositions: [],
                       })
                     }
                     className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>নতুন খেলোয়াড় যোগ করুন</span>
+                    <span>নতুন ক্রীড়া বিভাগ যোগ করুন</span>
                   </button>
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sportCategories
+                    .sort((a, b) => a.order - b.order)
+                    .map((cat) => (
+                      <div
+                        key={cat.id}
+                        className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col justify-between hover:border-slate-700 transition"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-3xl p-2 rounded-2xl bg-slate-950 border border-slate-800">
+                              {cat.iconEmoji || '🏅'}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                cat.isActive
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-slate-800 text-slate-400'
+                              }`}
+                            >
+                              {cat.isActive ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-lg font-bold text-white mb-1">{cat.nameBn}</h3>
+                          <div className="text-xs text-slate-400 font-medium mb-3">{cat.nameEn}</div>
+                          <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+                            {cat.descriptionBn || cat.descriptionEn}
+                          </p>
+
+                          <div className="space-y-1 text-[11px] text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800/80 mb-4">
+                            <div>
+                              <span className="text-slate-500">Key:</span> <span className="font-mono text-emerald-400">{cat.key}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Score Format:</span> <span className="text-slate-300">{cat.scoreType}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">পয়েন্ট টেবিল:</span>{' '}
+                              <span className="text-slate-300">{cat.supportsPointsTable ? 'হ্যাঁ' : 'প্রযোজ্য নয়'}</span>
+                            </div>
+                            {cat.allowedPositions && cat.allowedPositions.length > 0 && (
+                              <div className="truncate">
+                                <span className="text-slate-500">রোল/পজিশন:</span>{' '}
+                                <span className="text-amber-400 font-medium">{cat.allowedPositions.join(', ')}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                          <span className="text-xs text-slate-500">ক্রম: {cat.order}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setEditingSportCategory({ ...cat })}
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer"
+                            >
+                              সম্পাদনা
+                            </button>
+                            {cat.key !== 'football' && (
+                              <button
+                                onClick={() =>
+                                  setConfirmConfig({
+                                    isOpen: true,
+                                    title: 'ক্রীড়া বিভাগ মুছুন',
+                                    message: `আপনি কি নিশ্চিত '${cat.nameBn}' বিভাগটি মুছে ফেলতে চান?`,
+                                    onConfirm: async () => {
+                                      try {
+                                        await deleteSportCategory(cat.id);
+                                        await refreshAllData();
+                                        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                        showToast('বিভাগ সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে', 'success');
+                                      } catch (err: any) {
+                                        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                        showToast(`মুছতে ব্যর্থ হয়েছে: ${err.message || 'ত্রুটি'}`, 'error');
+                                      }
+                                    },
+                                  })
+                                }
+                                className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Sport Category Edit Modal */}
+                {editingSportCategory && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 className="text-lg font-bold text-white">ক্রীড়া / সাংস্কৃতিক বিভাগ সম্পাদনা</h3>
+                        <button onClick={() => setEditingSportCategory(null)} className="text-slate-400 hover:text-white">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4 text-xs">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">বিভাগের নাম (বাংলা)</label>
+                            <input
+                              type="text"
+                              value={editingSportCategory.nameBn}
+                              onChange={(e) =>
+                                setEditingSportCategory({ ...editingSportCategory, nameBn: e.target.value })
+                              }
+                              placeholder="যেমন: ক্রিকেট"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Name in English</label>
+                            <input
+                              type="text"
+                              value={editingSportCategory.nameEn}
+                              onChange={(e) =>
+                                setEditingSportCategory({ ...editingSportCategory, nameEn: e.target.value })
+                              }
+                              placeholder="e.g. Cricket"
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">ইউনিক কী (Key)</label>
+                            <input
+                              type="text"
+                              disabled={editingSportCategory.key === 'football'}
+                              value={editingSportCategory.key}
+                              onChange={(e) =>
+                                setEditingSportCategory({
+                                  ...editingSportCategory,
+                                  key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                                })
+                              }
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white disabled:opacity-50 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">আইকন ইমোজি (Emoji)</label>
+                            <input
+                              type="text"
+                              value={editingSportCategory.iconEmoji}
+                              onChange={(e) =>
+                                setEditingSportCategory({ ...editingSportCategory, iconEmoji: e.target.value })
+                              }
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-center text-lg"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">স্কোর টাইপ / বিন্যাস</label>
+                          <select
+                            value={editingSportCategory.scoreType}
+                            onChange={(e) =>
+                              setEditingSportCategory({
+                                ...editingSportCategory,
+                                scoreType: e.target.value as any,
+                              })
+                            }
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                          >
+                            <option value="standard_goals">স্ট্যান্ডার্ড গোল (Standard Goals - ফুটবল)</option>
+                            <option value="cricket_overs">ক্রিকেট রান ও ওভার (Cricket Runs & Overs)</option>
+                            <option value="badminton_sets">সেট ও পয়েন্ট (Sets & Points - ব্যাডমিন্টন/ভলিবল/টিটি)</option>
+                            <option value="athletics_rank">র‌্যাঙ্ক ও সময় (Rank & Timing - অ্যাথলেটিক্স)</option>
+                            <option value="event_program">ইভেন্ট/অনুষ্ঠান সূচী (Event/Program - সংস্কৃতি)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">অনুমোদিত পজিশন / রোল (কমা দিয়ে পৃথক করুন)</label>
+                          <input
+                            type="text"
+                            value={
+                              Array.isArray(editingSportCategory.allowedPositions)
+                                ? editingSportCategory.allowedPositions.join(', ')
+                                : editingSportCategory.allowedPositions || ''
+                            }
+                            onChange={(e) =>
+                              setEditingSportCategory({
+                                ...editingSportCategory,
+                                allowedPositions: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) as any,
+                              })
+                            }
+                            placeholder="যেমন: Batsman, Bowler, All-Rounder, Wicket-Keeper"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">বাংলা বিবরণী</label>
+                          <textarea
+                            rows={2}
+                            value={editingSportCategory.descriptionBn}
+                            onChange={(e) =>
+                              setEditingSportCategory({ ...editingSportCategory, descriptionBn: e.target.value })
+                            }
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-4 pt-1">
+                          <label className="flex items-center gap-2 text-white cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingSportCategory.supportsPointsTable}
+                              onChange={(e) =>
+                                setEditingSportCategory({
+                                  ...editingSportCategory,
+                                  supportsPointsTable: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-emerald-600 bg-slate-950 border-slate-800"
+                            />
+                            <span>পয়েন্ট টেবিল সমর্থন করে</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-white cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingSportCategory.isActive}
+                              onChange={(e) =>
+                                setEditingSportCategory({
+                                  ...editingSportCategory,
+                                  isActive: e.target.checked,
+                                })
+                              }
+                              className="w-4 h-4 rounded text-emerald-600 bg-slate-950 border-slate-800"
+                            />
+                            <span>বিভাগ সক্রিয় থাকবে</span>
+                          </label>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">প্রদর্শন ক্রম (Order)</label>
+                          <input
+                            type="number"
+                            value={editingSportCategory.order}
+                            onChange={(e) =>
+                              setEditingSportCategory({ ...editingSportCategory, order: Number(e.target.value) })
+                            }
+                            className="w-28 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          disabled={isSavingSportCategory}
+                          onClick={() => setEditingSportCategory(null)}
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs cursor-pointer"
+                        >
+                          বাতিল
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingSportCategory}
+                          onClick={handleSaveSportCategoryModal}
+                          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg"
+                        >
+                          {isSavingSportCategory ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>সংরক্ষণ হচ্ছে...</span>
+                            </>
+                          ) : (
+                            <span>সংরক্ষণ করুন</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 7. PLAYERS MANAGEMENT */}
+            {activeTab === 'players' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">খেলোয়াড় স্কোয়াড ব্যবস্থাপনা</h2>
+                    <p className="text-xs text-slate-400">
+                      ক্লাবের ২০ জন খেলোয়াড়ের অফিসিয়াল স্কোয়াড, পজিশন, জার্সি নম্বর ও গোল পরিসংখ্যান আপডেট করুন।
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleSyncOfficialSquad}
+                      disabled={isSyncingSquad}
+                      className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      {isSyncingSquad ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>সিঙ্ক হচ্ছে...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          <span>২০ জন অফিসিয়াল স্কোয়াড সিঙ্ক</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        setEditingPlayer({
+                          id: `p-${players.length + 1}`,
+                          fullName: '',
+                          nameBn: '',
+                          jerseyNumber: players.length + 1,
+                          position: 'Striker',
+                          photoUrl: '',
+                          bio: '',
+                          appearances: 0,
+                          goals: 0,
+                          assists: 0,
+                          cleanSheets: 0,
+                          isActive: true,
+                          isCaptain: false,
+                          order: players.length + 1,
+                        })
+                      }
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>নতুন খেলোয়াড় যোগ করুন</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Squad Synchronization Report Banner */}
+                {syncReport && (
+                  <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm text-emerald-400">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                        <span>২০ জন খেলোয়াড় স্কোয়াড সিঙ্ক সম্পন্ন হয়েছে!</span>
+                      </div>
+                      <button
+                        onClick={() => setSyncReport(null)}
+                        className="text-emerald-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-emerald-500/20 text-slate-300">
+                      <div>
+                        <span className="font-bold text-white">পুনব্যবহারকৃত রেকর্ড ({syncReport.reused}):</span>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          {syncReport.reused > 0
+                            ? syncReport.reusedPlayers.join(', ')
+                            : '০টি (ডাটাবেজে পূর্বে কোনো রেকর্ড ছিল না)'}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-bold text-white">নতুন প্রস্তুতকৃত রেকর্ড ({syncReport.created}):</span>
+                        <div className="text-[11px] text-emerald-300 mt-1">
+                          {syncReport.created} জন খেলোয়াড় ফায়ারস্টোরে সফলভাবে সংরক্ষিত হয়েছে।
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {players.map((p) => (
@@ -1441,19 +2191,34 @@ export const AdminDashboard: React.FC = () => {
                       key={p.id}
                       className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between"
                     >
-                      <div className="relative aspect-4/5 bg-slate-950">
-                        <img src={p.photoUrl} alt="" className="w-full h-full object-cover object-top" />
-                        <div className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-emerald-600 text-white font-mono font-black text-sm flex items-center justify-center">
+                      <div className="relative aspect-4/5 bg-slate-950 flex items-center justify-center">
+                        {p.photoUrl && p.photoUrl.trim() !== '' ? (
+                          <img src={p.photoUrl} alt="" className="w-full h-full object-cover object-top" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-b from-[#0c2e1a] via-slate-950 to-slate-950 flex flex-col items-center justify-center p-4">
+                            <PlayerKitBadge
+                              photoUrl=""
+                              jerseyNumber={p.jerseyNumber}
+                              name={p.fullName}
+                              size="md"
+                              isCaptain={p.isCaptain}
+                            />
+                            <span className="mt-2 text-[9px] font-black uppercase tracking-wider text-emerald-400">
+                              CSC Kit #{p.jerseyNumber}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-emerald-600 text-white font-mono font-black text-sm flex items-center justify-center shadow">
                           #{p.jerseyNumber}
                         </div>
                         {p.isCaptain && (
-                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[9px]">
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[9px] shadow">
                             C
                           </div>
                         )}
-                        <div className="absolute bottom-2 left-2 right-2">
+                        <div className="absolute bottom-2 left-2 right-2 bg-slate-950/80 backdrop-blur-sm p-1.5 rounded-lg border border-slate-800">
                           <span className="text-[10px] text-emerald-400 font-bold block">{p.position}</span>
-                          <h4 className="text-sm font-bold text-white truncate">{p.fullName}</h4>
+                          <h4 className="text-xs sm:text-sm font-bold text-white truncate">{p.fullName}</h4>
                         </div>
                       </div>
 
@@ -1473,10 +2238,15 @@ export const AdminDashboard: React.FC = () => {
                                 title: 'খেলোয়াড় মুছুন',
                                 message: `আপনি কি নিশ্চিত ${p.fullName} কে স্কোয়াড থেকে মুছে ফেলতে চান?`,
                                 onConfirm: async () => {
-                                  await deletePlayer(p.id);
-                                  await refreshAllData();
-                                  setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
-                                  showToast('খেলোয়াড় রেকর্ড মোছা হয়েছে', 'info');
+                                  try {
+                                    await deletePlayer(p.id);
+                                    await refreshAllData();
+                                    setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                    showToast('খেলোয়াড় রেকর্ড সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে', 'success');
+                                  } catch (err: any) {
+                                    setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                    showToast(`খেলোয়াড় মুছতে ব্যর্থ হয়েছে: ${err.message || 'ত্রুটি'}`, 'error');
+                                  }
                                 },
                               })
                             }
@@ -1505,10 +2275,26 @@ export const AdminDashboard: React.FC = () => {
                         label="খেলোয়াড়ের প্রতিকৃতি ছবি (Player Portrait Photo)"
                         value={editingPlayer.photoUrl}
                         onChange={(url) => setEditingPlayer({ ...editingPlayer, photoUrl: url })}
+                        onUploadingChange={setIsUploadingPlayer}
                         folder="players"
                       />
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div className="sm:col-span-2">
+                          <label className="block text-slate-300 font-semibold mb-1">ক্রীড়া / শাখা (Sport/Discipline) *</label>
+                          <select
+                            value={editingPlayer.sport || 'football'}
+                            onChange={(e) => setEditingPlayer({ ...editingPlayer, sport: e.target.value as any })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold"
+                          >
+                            {sportCategories.map((sc) => (
+                              <option key={sc.id} value={sc.key}>
+                                {sc.iconEmoji} {sc.nameBn} ({sc.nameEn})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
                         <div>
                           <label className="block text-slate-300 font-semibold mb-1">পূর্ণ নাম (Full Name) *</label>
                           <input
@@ -1531,7 +2317,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">জার্সি নম্বর (Jersey No) *</label>
+                          <label className="block text-slate-300 font-semibold mb-1">জার্সি / আইডি নম্বর *</label>
                           <input
                             type="number"
                             required
@@ -1543,63 +2329,158 @@ export const AdminDashboard: React.FC = () => {
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">খেলার পজিশন *</label>
-                          <select
-                            value={editingPlayer.position}
-                            onChange={(e) => setEditingPlayer({ ...editingPlayer, position: e.target.value as any })}
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
-                          >
-                            <option value="Goalkeeper">গোলরক্ষক (Goalkeeper)</option>
-                            <option value="Defender">ডিফেন্ডার (Defender)</option>
-                            <option value="Midfielder">মিডফিল্ডার (Midfielder)</option>
-                            <option value="Forward">ফরওয়ার্ড (Forward)</option>
-                          </select>
-                        </div>
+                        {/* Sport-specific Role and Fields */}
+                        {editingPlayer.sport === 'cricket' ? (
+                          <>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">ক্রিকেট রোল *</label>
+                              <select
+                                value={editingPlayer.sportRole || 'All-Rounder'}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, sportRole: e.target.value as any })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              >
+                                <option value="Batsman">ব্যাটসম্যান (Batsman)</option>
+                                <option value="Bowler">বোলার (Bowler)</option>
+                                <option value="All-Rounder">অলরাউন্ডার (All-Rounder)</option>
+                                <option value="Wicket-Keeper">উইকেটকিপার (Wicket-Keeper)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">মোট রান</label>
+                              <input
+                                type="number"
+                                value={editingPlayer.runsScored ?? 0}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, runsScored: Number(e.target.value) })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">মোট উইকেট</label>
+                              <input
+                                type="number"
+                                value={editingPlayer.wicketsTaken ?? 0}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, wicketsTaken: Number(e.target.value) })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                              />
+                            </div>
+                          </>
+                        ) : editingPlayer.sport === 'athletics' ? (
+                          <>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">ইভেন্ট / রোল *</label>
+                              <select
+                                value={editingPlayer.sportRole || 'Sprinter'}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, sportRole: e.target.value as any })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              >
+                                <option value="Sprinter">স্প্রিন্টার / দৌড়বিদ (Sprinter)</option>
+                                <option value="Athlete">অ্যাথলেট (Athlete)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">ব্যক্তিগত সেরা টাইমিং / রেকর্ড</label>
+                              <input
+                                type="text"
+                                placeholder="উদা: ১০.৮৫ সেকেন্ড (১০০মি)"
+                                value={editingPlayer.personalBest || ''}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, personalBest: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">মোট মেডেল সংখ্যা</label>
+                              <input
+                                type="number"
+                                value={editingPlayer.medalsWon ?? 0}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, medalsWon: Number(e.target.value) })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                              />
+                            </div>
+                          </>
+                        ) : editingPlayer.sport === 'cultural' ? (
+                          <>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">সাংস্কৃতিক ভূমিকা *</label>
+                              <select
+                                value={editingPlayer.sportRole || 'Performer'}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, sportRole: e.target.value as any })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              >
+                                <option value="Performer">শিল্পী / পারফর্মার (Performer)</option>
+                                <option value="Organizer">সাংস্কৃতিক সংগঠক (Organizer)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">শিল্পধারা / মাধ্যম</label>
+                              <input
+                                type="text"
+                                placeholder="উদা: লোকসংগীত, নাটক, আবৃত্তি, বাদ্যযন্ত্র"
+                                value={editingPlayer.culturalGenre || ''}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, culturalGenre: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">খেলার পজিশন *</label>
+                              <select
+                                value={editingPlayer.position}
+                                onChange={(e) => setEditingPlayer({ ...editingPlayer, position: e.target.value as any })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              >
+                                <option value="Goalkeeper">গোলরক্ষক (Goalkeeper)</option>
+                                <option value="Defender">ডিফেন্ডার (Defender)</option>
+                                <option value="Midfielder">মিডফিল্ডার (Midfielder)</option>
+                                <option value="Attacking Midfielder">অ্যাটাকিং মিডফিল্ডার (Attacking Midfielder)</option>
+                                <option value="Striker">স্ট্রাইকার (Striker)</option>
+                                <option value="Forward">ফরওয়ার্ড (Forward)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">মোট গোল</label>
+                              <input
+                                type="number"
+                                value={editingPlayer.goals}
+                                onChange={(e) =>
+                                  setEditingPlayer({ ...editingPlayer, goals: Number(e.target.value) })
+                                }
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">অ্যাসিস্ট</label>
+                              <input
+                                type="number"
+                                value={editingPlayer.assists}
+                                onChange={(e) =>
+                                  setEditingPlayer({ ...editingPlayer, assists: Number(e.target.value) })
+                                }
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">ক্লিন শিট (গোলরক্ষকের জন্য)</label>
+                              <input
+                                type="number"
+                                value={editingPlayer.cleanSheets}
+                                onChange={(e) =>
+                                  setEditingPlayer({ ...editingPlayer, cleanSheets: Number(e.target.value) })
+                                }
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                              />
+                            </div>
+                          </>
+                        )}
 
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">মোট ম্যাচ (Caps)</label>
+                          <label className="block text-slate-300 font-semibold mb-1">অংশগ্রহণকৃত ম্যাচ / ইভেন্ট সংখ্যা</label>
                           <input
                             type="number"
                             value={editingPlayer.appearances}
                             onChange={(e) =>
                               setEditingPlayer({ ...editingPlayer, appearances: Number(e.target.value) })
-                            }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">মোট গোল</label>
-                          <input
-                            type="number"
-                            value={editingPlayer.goals}
-                            onChange={(e) =>
-                              setEditingPlayer({ ...editingPlayer, goals: Number(e.target.value) })
-                            }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">অ্যাসিস্ট</label>
-                          <input
-                            type="number"
-                            value={editingPlayer.assists}
-                            onChange={(e) =>
-                              setEditingPlayer({ ...editingPlayer, assists: Number(e.target.value) })
-                            }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">ক্লিন শিট (গোলরক্ষকের জন্য)</label>
-                          <input
-                            type="number"
-                            value={editingPlayer.cleanSheets}
-                            onChange={(e) =>
-                              setEditingPlayer({ ...editingPlayer, cleanSheets: Number(e.target.value) })
                             }
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
                           />
@@ -1639,30 +2520,92 @@ export const AdminDashboard: React.FC = () => {
 
                       <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
                         <button
+                          type="button"
+                          disabled={isSavingPlayer || isUploadingPlayer}
                           onClick={() => setEditingPlayer(null)}
-                          className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs"
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs cursor-pointer"
                         >
                           বাতিল
                         </button>
                         <button
-                          onClick={async () => {
-                            if (!editingPlayer.fullName.trim()) {
-                              showToast('খেলোয়াড়ের নাম আবশ্যক', 'error');
-                              return;
-                            }
-                            await savePlayer(editingPlayer);
-                            await refreshAllData();
-                            setEditingPlayer(null);
-                            showToast('খেলোয়াড় সফলভাবে সংরক্ষিত হয়েছে!', 'success');
-                          }}
-                          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                          type="button"
+                          disabled={isSavingPlayer || isUploadingPlayer}
+                          onClick={handleSavePlayerModal}
+                          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg"
                         >
-                          সংরক্ষণ করুন
+                          {isSavingPlayer ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>সংরক্ষণ হচ্ছে...</span>
+                            </>
+                          ) : isUploadingPlayer ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>ছবি আপলোড হচ্ছে...</span>
+                            </>
+                          ) : (
+                            <span>সংরক্ষণ করুন</span>
+                          )}
                         </button>
                       </div>
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* 7.5. MATCH LINEUP & SQUAD BOARD (REAL SOCIEDAD STYLE) */}
+            {activeTab === 'lineup' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-amber-400" />
+                      <span>ম্যাচ ট্যাকটিক্যাল লাইনআপ বোর্ড (Match Lineup)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      রিয়েল সোসিয়েদাদ স্টাইল ট্যাকটিক্যাল পিচ বোর্ডে শুরুর একাদশ (Starting XI) ও রিজার্ভ খেলোয়াড় সাজিয়ে ফায়ারস্টোরে সংরক্ষণ করুন।
+                    </p>
+                  </div>
+                </div>
+
+                <SquadBoard
+                  allMatches={matches}
+                  allPlayers={players}
+                  isEditable={true}
+                  clubLogo={settings.logoUrl || DEFAULT_LOGO_SVG}
+                  clubNameBn={settings.clubNameBn}
+                  clubNameEn={settings.clubNameEn}
+                  showToast={showToast}
+                  onSaveSuccess={async () => {
+                    await refreshAllData();
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 7.6. FRIENDLY SQUAD BUILDER */}
+            {activeTab === 'squad_builder' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <PlusCircle className="w-5 h-5 text-emerald-400" />
+                      <span>ফ্রেন্ডলি স্কোয়াড বিল্ডার (Squad Builder)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      নিবন্ধিত খেলোয়াড়দের ডাটাবেজ থেকে নিজস্ব স্কোয়াড তৈরি করুন, ফরমেশন ঠিক করুন এবং ক্লাউড ফায়ারস্টোরে সংরক্ষণ করুন।
+                    </p>
+                  </div>
+                </div>
+
+                <SquadBuilder
+                  allPlayers={players}
+                  clubLogo={settings.logoUrl || DEFAULT_LOGO_SVG}
+                  clubNameBn={settings.clubNameBn}
+                  clubNameEn={settings.clubNameEn}
+                  showToast={showToast}
+                />
               </div>
             )}
 
@@ -1755,10 +2698,15 @@ export const AdminDashboard: React.FC = () => {
                               title: 'ম্যাচ মুছুন',
                               message: 'আপনি কি নিশ্চিত এই ম্যাচ রেকর্ডটি মুছে ফেলতে চান?',
                               onConfirm: async () => {
-                                await deleteMatch(m.id);
-                                await refreshAllData();
-                                setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
-                                showToast('ম্যাচ মোছা হয়েছে', 'info');
+                                try {
+                                  await deleteMatch(m.id);
+                                  await refreshAllData();
+                                  setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                  showToast('ম্যাচ সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে', 'success');
+                                } catch (err: any) {
+                                  setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                  showToast(`ম্যাচ মুছতে ব্যর্থ হয়েছে: ${err.message || 'ডাটাবেজ ত্রুটি'}`, 'error');
+                                }
                               },
                             })
                           }
@@ -1783,6 +2731,21 @@ export const AdminDashboard: React.FC = () => {
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="col-span-2">
+                          <label className="block text-slate-300 font-semibold mb-1">ক্রীড়া / শাখা (Sport/Discipline) *</label>
+                          <select
+                            value={editingMatch.sport || 'football'}
+                            onChange={(e) => setEditingMatch({ ...editingMatch, sport: e.target.value as any })}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold"
+                          >
+                            {sportCategories.map((sc) => (
+                              <option key={sc.id} value={sc.key}>
+                                {sc.iconEmoji} {sc.nameBn} ({sc.nameEn})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
                         <div>
                           <label className="block text-slate-300 font-semibold mb-1">হোম টিম (Home Team)</label>
                           <input
@@ -1818,7 +2781,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">টুর্নামেন্টের নাম</label>
+                          <label className="block text-slate-300 font-semibold mb-1">টুর্নামেন্ট / ইভেন্টের নাম</label>
                           <input
                             type="text"
                             value={editingMatch.tournamentName}
@@ -1827,8 +2790,56 @@ export const AdminDashboard: React.FC = () => {
                           />
                         </div>
 
+                        {/* Sport-specific score fields */}
+                        {editingMatch.sport === 'cricket' ? (
+                          <>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">হোম স্কোর বিবরণ (যেমন: ১৬৮/৫ ২০ ওভ.)</label>
+                              <input
+                                type="text"
+                                placeholder="১৬৮/৫ (২০ ওভ.)"
+                                value={editingMatch.homeScoreDisplay || ''}
+                                onChange={(e) => setEditingMatch({ ...editingMatch, homeScoreDisplay: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">অ্যাওয়ে স্কোর বিবরণ (যেমন: ১৫৬/৮ ২০ ওভ.)</label>
+                              <input
+                                type="text"
+                                placeholder="১৫৬/৮ (২০ ওভ.)"
+                                value={editingMatch.awayScoreDisplay || ''}
+                                onChange={(e) => setEditingMatch({ ...editingMatch, awayScoreDisplay: e.target.value })}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                              />
+                            </div>
+                          </>
+                        ) : editingMatch.sport === 'badminton' || editingMatch.sport === 'volleyball' || editingMatch.sport === 'table_tennis' ? (
+                          <div className="col-span-2">
+                            <label className="block text-slate-300 font-semibold mb-1">সেট ও স্কোর বিবরণ</label>
+                            <input
+                              type="text"
+                              placeholder="উদা: ২ - ১ সেট (২১-১৯, ১৮-২১, ২১-১৬)"
+                              value={editingMatch.homeScoreDisplay || ''}
+                              onChange={(e) => setEditingMatch({ ...editingMatch, homeScoreDisplay: e.target.value })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono"
+                            />
+                          </div>
+                        ) : editingMatch.sport === 'cultural' || editingMatch.sport === 'athletics' ? (
+                          <div className="col-span-2">
+                            <label className="block text-slate-300 font-semibold mb-1">ইভেন্ট / অধিবেশন বিবরণ</label>
+                            <input
+                              type="text"
+                              placeholder="উদা: নাটক, আবৃত্তি, সংগীত ও গুণীজন সংবর্ধনা"
+                              value={editingMatch.roundOrEventDetails || ''}
+                              onChange={(e) => setEditingMatch({ ...editingMatch, roundOrEventDetails: e.target.value })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                            />
+                          </div>
+                        ) : null}
+
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">হোম টিম স্কোর (Goals)</label>
+                          <label className="block text-slate-300 font-semibold mb-1">হোম স্কোর (সংখ্যাত্মক)</label>
                           <input
                             type="number"
                             min="0"
@@ -1841,7 +2852,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">অ্যাওয়ে টিম স্কোর (Goals)</label>
+                          <label className="block text-slate-300 font-semibold mb-1">অ্যাওয়ে স্কোর (সংখ্যাত্মক)</label>
                           <input
                             type="number"
                             min="0"
@@ -1864,7 +2875,7 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">সময় (Kickoff)</label>
+                          <label className="block text-slate-300 font-semibold mb-1">সময় (Kickoff / Start)</label>
                           <input
                             type="time"
                             value={editingMatch.matchTime}
@@ -1884,10 +2895,10 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div className="col-span-2">
-                          <label className="block text-slate-300 font-semibold mb-1">গোলদাতাদের বিবরণ</label>
+                          <label className="block text-slate-300 font-semibold mb-1">স্কোরার / কৃতি খেলোয়াড় বিবরণ</label>
                           <input
                             type="text"
-                            placeholder="উদা: রফিকুল (১৮', ৭২'), বাবু (৫৪')"
+                            placeholder="উদা: রফিক (৫২ রান ও ৩ উইকেট), বাবু (৫৪')"
                             value={editingMatch.scorers || ''}
                             onChange={(e) => setEditingMatch({ ...editingMatch, scorers: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
@@ -1914,10 +2925,14 @@ export const AdminDashboard: React.FC = () => {
                         </button>
                         <button
                           onClick={async () => {
-                            await saveMatch(editingMatch);
-                            await refreshAllData();
-                            setEditingMatch(null);
-                            showToast('ম্যাচ তথ্য সংরক্ষিত হয়েছে!', 'success');
+                            try {
+                              await saveMatch(editingMatch);
+                              await refreshAllData();
+                              setEditingMatch(null);
+                              showToast('ম্যাচ তথ্য সফলভাবে ডাটাবেজে সংরক্ষিত হয়েছে!', 'success');
+                            } catch (err: any) {
+                              showToast(`ম্যাচ সংরক্ষণে ত্রুটি: ${err.message || 'ব্যর্থ হয়েছে'}`, 'error');
+                            }
                           }}
                           className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
                         >

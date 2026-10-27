@@ -114,9 +114,9 @@ export const Standings: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-4 px-4 font-bold text-white flex items-center gap-3">
-                        {row.teamLogo && (
+                        {row.teamLogo && row.teamLogo.trim() !== '' ? (
                           <img src={row.teamLogo} alt="" className="w-7 h-7 object-contain shrink-0" />
-                        )}
+                        ) : null}
                         <span className="truncate max-w-[220px]">{row.teamName}</span>
                         {isHome && (
                           <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
